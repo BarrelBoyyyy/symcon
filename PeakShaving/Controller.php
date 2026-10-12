@@ -48,7 +48,7 @@ final class PeakPlanner
         if (!in_array($distribution, ['priority', 'equal'], true)) {
             throw new RuntimeException('Ungültige Verbraucherverteilung');
         }
-        if ($distribution === 'equal' && $consumers && abs($remaining) > 0.000000001) {
+        if ($distribution === 'equal' && $consumers) {
             // Gleichmäßige Gesamtleistung (nicht identische Stromwerte): begrenzte
             // Verbraucher ausschöpfen und deren übriges Budget auf die anderen verteilen.
             $budget = max(0, array_sum(array_column($consumers, 'actual')) - $remaining);
@@ -83,34 +83,31 @@ final class PeakPlanner
             }
             return self::finish($effectiveError, $battery, $charge, $discharge, $consumers, $commands);
         }
-        // Größere Prioritätswerte zuerst reduzieren, kleinere zuerst wieder versorgen.
-        uasort($consumers, static function (array $a, array $b) use ($remaining): int {
-            return $remaining > 0 ? $b['Priority'] <=> $a['Priority'] : $a['Priority'] <=> $b['Priority'];
-        });
+        // Das gesamte Lastbudget nach Reihenfolge neu verteilen, auch bei
+        // ausgeschöpftem Puffer: sonst könnte Drag & Drop keine Leistung verschieben.
+        $budget = max(0, array_sum(array_column($consumers, 'actual')) - $remaining);
+        uasort($consumers, static fn(array $a, array $b): int => $a['Priority'] <=> $b['Priority']);
         $commands = [];
-        $direction = $remaining;
         foreach ($consumers as $key => $c) {
-            if (abs($remaining) < 0.000000001 || $remaining * $direction < 0) {
-                break;
-            }
             $factor = self::factor($c);
-            $wanted = max(0, min($c['Max'], ($c['actual'] - $remaining) / $factor));
-            // Abrunden verhindert eine Budgetüberschreitung durch die Schrittweite.
-            $units = floor($wanted / $c['Step']) * $c['Step'];
-            $units = min($c['Max'], $units);
+            $wanted = min($c['Max'], $budget / $factor);
+            $units = min($c['Max'], floor(($wanted + 0.000000001) / $c['Step']) * $c['Step']);
             if ($c['Unit'] === 'Switch') {
-                $units = $wanted >= $c['Max'] ? $c['Max'] : 0;
+                $units = $wanted + 0.000000001 >= $c['Max'] ? $c['Max'] : 0;
             }
             if ($units > 0 && $units < $c['Min']) {
                 $units = 0;
             }
-            // Minderverbrauch gleicht einen positiven Rest aus; Mehrverbrauch
-            // verbraucht negatives Restbudget. Istwerte nicht doppelt subtrahieren.
-            $remaining -= $c['actual'] - $units * $factor;
-            $commands[$key] = $c['Unit'] === 'Switch' ? ($units > 0 ? 1 : 0) : $units;
+            $budget -= $units * $factor;
+            $value = $c['Unit'] === 'Switch' ? ($units > 0 ? 1 : 0) : $units;
+            $changed = isset($c['commanded']) ? abs($value - $c['commanded']) > 0.000000001 : abs($units * $factor - $c['actual']) > 0.000000001;
+            if ($changed) {
+                $commands[$key] = $value;
+            }
         }
         return self::finish($effectiveError, $battery, $charge, $discharge, $consumers, $commands);
     }
+
     private static function finish(float $error, float $battery, float $charge, float $discharge, array $consumers, array $commands): array
     {
         // Nur benötigte Batterieleistung anfordern: Mehrverbrauch durch Lasten

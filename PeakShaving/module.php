@@ -31,6 +31,9 @@ class PeakShaving extends IPSModule
         $this->RegisterAttributeString('OutputUnit', 'W');
         $this->RegisterAttributeString('LoadOverrides', '{}');
         $this->RegisterAttributeString('LoadConfig', '');
+        $this->RegisterAttributeBoolean('RecoveryCharging', false);
+        $this->RegisterAttributeString('DistributionOverride', '');
+        $this->RegisterAttributeString('DistributionConfig', '');
         $this->RegisterAttributeString('Trace', '[]');
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeString('LastRun', '');
@@ -49,6 +52,10 @@ class PeakShaving extends IPSModule
         try {
             if (method_exists($this, 'SetVisualizationType')) {
                 $this->SetVisualizationType(1);
+            }
+            if ($this->ReadAttributeString('DistributionConfig') !== $this->ReadPropertyString('Distribution')) {
+                $this->WriteAttributeString('DistributionOverride', '');
+                $this->WriteAttributeString('DistributionConfig', $this->ReadPropertyString('Distribution'));
             }
             $profile = $this->powerProfile();
             $this->RegisterVariableFloat('Grid', $this->Translate('Netzbezug'), $profile, 1);
@@ -99,7 +106,7 @@ class PeakShaving extends IPSModule
             $this->SetTimerInterval('Control', 0);
             $this->SetValue('PeakActive', false);
             $this->SetValue('State', $e->getMessage());
-$this->WriteAttributeString('LastError', $e->getMessage());
+            $this->WriteAttributeString('LastError', $e->getMessage());
             $this->trace('Fehler', ['Meldung' => $e->getMessage()]);
             $this->SetStatus(200);
         }
@@ -245,8 +252,8 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             $entry['Istleistung'] = $this->diagnosticVariable((int) ($load['ActualPower'] ?? 0));
             $loads[] = $entry;
         }
-        return json_encode(['Modulversion' => '0.5.1', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
-            'Letzte Regelung UTC' => $this->ReadAttributeString('LastRun'), 'Letzter Fehler' => $this->ReadAttributeString('LastError'),
+        return json_encode(['Modulversion' => '0.6', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
+            'Letzte Regelung UTC' => $this->ReadAttributeString('LastRun'), 'Letzter Fehler' => $this->ReadAttributeString('LastError'), 'Wiederaufladen' => $this->ReadAttributeBoolean('RecoveryCharging'), 'Aktuelle Verteilung' => $this->distribution(),
             'Regelstatus' => $this->GetValue('State'), 'Einstellungen' => $settings, 'Variablen' => $variables,
             'Verbraucher' => $loads, 'Netzvariable abonniert' => (int) $this->ReadAttributeString('SubscribedGrid'),
             'Letzte Ereignisse' => json_decode($this->ReadAttributeString('Trace'), true)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -274,6 +281,11 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         $report = $this->GetDiagnostics();
         $this->SetValue('Diagnostics', $report);
         return $report;
+    }
+
+    private function distribution(): string
+    {
+        return $this->ReadAttributeString('DistributionOverride') ?: $this->ReadPropertyString('Distribution');
     }
 
     private function powerFactor(): float
@@ -318,6 +330,9 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             }
             if ($name === 'Interval') {
                 $element['visible'] = $this->ReadPropertyString('UpdateMode') === 'timer';
+            }
+            if ($name === 'Distribution') {
+                $element['value'] = $this->distribution();
             }
             if ($name === 'Consumers') {
                 $element = $this->loadFormUnit($element, $unit);
@@ -486,7 +501,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         return ['battery' => $battery, 'grid' => $this->GetValue('Grid'), 'target' => $this->ReadPropertyFloat('Target'),
             'active' => $this->GetValue('PeakActive'), 'state' => $this->GetValue('State'),
             'enabled' => $this->ReadPropertyBoolean('Enabled'), 'unit' => $this->ReadPropertyString('PowerUnit'),
-            'distribution' => $this->ReadPropertyString('Distribution'), 'loads' => $loads];
+            'distribution' => $this->distribution(), 'loads' => $loads];
     }
 
     private function publishVisualization(): void
@@ -498,6 +513,17 @@ $this->WriteAttributeString('LastError', $e->getMessage());
 
     public function RequestAction($Ident, $Value)
     {
+        if ($Ident === 'Distribution') {
+            if (!in_array($Value, ['priority', 'equal'], true)) {
+                throw new RuntimeException('Ungültige Verteilungsart');
+            }
+            $this->WriteAttributeString('DistributionOverride', $Value);
+            if ($this->ReadPropertyBoolean('Enabled')) {
+                $this->Control();
+            }
+            $this->publishVisualization();
+            return;
+        }
         $loads = json_decode($this->ReadPropertyString('Consumers'), true, 512, JSON_THROW_ON_ERROR);
         $ids = array_map(static fn(array $load): int => (int) $load['Setpoint'], $loads);
         $overrides = json_decode($this->ReadAttributeString('LoadOverrides'), true, 512, JSON_THROW_ON_ERROR);
@@ -533,6 +559,10 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             throw new RuntimeException('Unbekannte Aktion');
         }
         $this->WriteAttributeString('LoadOverrides', json_encode($overrides, JSON_THROW_ON_ERROR));
+        $this->trace('Bedienung', ['Aktion' => $Ident]);
+        if ($this->ReadPropertyBoolean('Enabled')) {
+            $this->Control();
+        }
         $this->publishVisualization();
     }
 
@@ -611,6 +641,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             $battery = 0.0;
             $charge = $discharge = 0.0;
             $ids = [];
+            $recovery = false;
             if ($hasBattery) {
                 $this->checkAction($batteryID);
                 $ids[] = $batteryID;
@@ -635,6 +666,22 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 }
                 $charge = ($soc === null || $soc < $max) ? $this->ReadPropertyFloat('MaxCharge') : 0;
                 $discharge = ($soc === null || $soc > $min) ? $this->ReadPropertyFloat('MaxDischarge') : 0;
+                $recovery = $this->ReadAttributeBoolean('RecoveryCharging');
+                $recoveryTarget = min($max, max(5.0, $min));
+                if ($soc === null) {
+                    $recovery = false;
+                } elseif ($soc <= 0) {
+                    $recovery = true;
+                } elseif ($soc >= $recoveryTarget) {
+                    $recovery = false;
+                }
+                $this->WriteAttributeBoolean('RecoveryCharging', $recovery);
+                if ($recovery) {
+                    $discharge = 0;
+                }
+            }
+            if (!$hasBattery) {
+                $this->WriteAttributeBoolean('RecoveryCharging', false);
             }
             $consumers = json_decode($this->ReadPropertyString('Consumers'), true, 512, JSON_THROW_ON_ERROR);
             if (!is_array($consumers)) {
@@ -667,9 +714,16 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             }
             unset($c);
             $automatic = array_filter($consumers, static fn(array $c): bool => $c['Mode'] === 'Auto' && $c['allowed']);
-            $plan = PeakPlanner::plan($grid, $this->ReadPropertyFloat('Target'), $this->ReadPropertyFloat('Hysteresis'), $battery, $charge, $discharge, $automatic, $this->ReadPropertyString('Distribution'), $this->ReadPropertyBoolean('BatteryBuffer'));
-            $override = $this->ReadPropertyBoolean('PeakOverridesHold') && $grid > $this->ReadPropertyFloat('Target') + $this->ReadPropertyFloat('Hysteresis');
-            $notes = [];
+            $plan = PeakPlanner::plan($grid, $this->ReadPropertyFloat('Target'), $this->ReadPropertyFloat('Hysteresis'), $battery, $charge, $discharge, $automatic, $this->distribution(), $this->ReadPropertyBoolean('BatteryBuffer'));
+            if ($recovery) {
+                // Geplanter Bezug nach dem fest vorgegebenen Wiederaufladen:
+                // Netz-Ist + Ladeleistung + bisherige Entladeleistung.
+                $recoveryLoads = array_filter($consumers, static fn(array $c): bool => $c['Mode'] !== 'Off' && $c['allowed']);
+                $plan = PeakPlanner::plan($grid + $charge + $battery, $this->ReadPropertyFloat('Target'), $this->ReadPropertyFloat('Hysteresis'), 0, 0, 0, $recoveryLoads, $this->distribution(), false);
+                $plan['battery'] = -$charge;
+            }
+            $override = $recovery || ($this->ReadPropertyBoolean('PeakOverridesHold') && $grid > $this->ReadPropertyFloat('Target') + $this->ReadPropertyFloat('Hysteresis'));
+            $notes = $recovery ? ['Batterie aus dem Netz wiederaufladen bis ' . $recoveryTarget . ' % SOC; Verbraucher reduziert'] : [];
             foreach ($consumers as $key => $c) {
                 $id = (string) $c['Setpoint'];
                 $state = $timing[$id] ?? ['started' => 0, 'deficit' => 0, 'changed' => 0];
@@ -680,11 +734,15 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                     $state['started'] = 0;
                 }
                 $wanted = $plan['consumers'][$key] ?? $c['commanded'];
-                if ($c['Mode'] !== 'Auto') {
+                if ($c['Mode'] !== 'Auto' && !($recovery && $c['Mode'] === 'On')) {
                     $wanted = $c['Mode'] === 'On' ? ($c['Unit'] === 'Switch' ? 1 : $c['Max']) : 0;
                 } elseif (!$c['allowed']) {
                     $wanted = 0;
                     $notes[] = $c['ConditionHint'] ?: 'Verbraucher durch Bedingung gesperrt';
+                }
+                if ($recovery) {
+                    // Während Wiederaufladung keine zusätzlichen Lasten einschalten.
+                    $wanted = min($wanted, $c['commanded']);
                 }
                 $forceStop = $c['Mode'] === 'Off' || (!$c['allowed'] && $c['StopOnCondition']);
                 if ($wanted == 0 && $active) {
@@ -706,7 +764,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 }
                 $timing[$id] = $state;
             }
-            if ($plan['battery'] !== null) {
+            if ($plan['battery'] !== null && !$recovery) {
                 // Laufzeitbindungen, Bedingungen und manuelle Modi können den Plan
                 // ändern. Den Batteriepuffer anhand der endgültigen Befehle nachführen.
                 $difference = $grid - $this->ReadPropertyFloat('Target');
@@ -716,6 +774,18 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                     $needed += ($load['Unit'] === 'Switch' ? ($value ? $load['Max'] : 0) : $value * PeakPlanner::factor($load)) - $load['actual'];
                 }
                 $plan['battery'] = max(-$charge, min($discharge, $needed));
+            }
+            // Bei Umverteilung zuerst Leistung freigeben, bevor andere Verbraucher
+            // erhöht werden. Das gilt auch beim Wechsel der Reihenfolge per Drag & Drop.
+            $prewritten = [];
+            foreach ($plan['consumers'] as $key => $value) {
+                $load = $consumers[$key];
+                if ($value >= $load['commanded']) {
+                    continue;
+                }
+                $sentValue = $load['Unit'] === 'A' && $load['ZeroToOne'] && $value == 0 ? 1 : $value;
+                $this->writeAction((int) $load['Setpoint'], $sentValue);
+                $prewritten[$key] = true;
             }
             // SOC-Grenzen gelten auch im Totbereich. Eine gemeinsame Variable
             // benötigt keinen Moduswechsel: Das konfigurierbare Vorzeichen bestimmt die Richtung.
@@ -755,7 +825,9 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 if ($c['Unit'] === 'A' && $c['ZeroToOne'] && $value == 0) {
                     $value = 1;
                 }
-                $this->writeAction((int) $c['Setpoint'], $value);
+                if (!isset($prewritten[$key])) {
+                    $this->writeAction((int) $c['Setpoint'], $value);
+                }
                 $id = (string) $c['Setpoint'];
                 $timing[$id]['changed'] = $now;
                 if (!$timing[$id]['started'] && $value > 0 && !($c['Unit'] === 'A' && $c['ZeroToOne'] && $value == 1)) {
@@ -780,7 +852,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         } catch (Throwable $e) {
             $this->SetValue('PeakActive', false);
             $this->SetValue('State', $e->getMessage());
-$this->WriteAttributeString('LastError', $e->getMessage());
+            $this->WriteAttributeString('LastError', $e->getMessage());
             $this->trace('Fehler', ['Meldung' => $e->getMessage()]);
             $this->SetStatus(200);
             $this->SendDebug('Regelung gestoppt', $e->getMessage(), 0);

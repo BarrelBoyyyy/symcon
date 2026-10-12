@@ -148,3 +148,14 @@ Die Kachel hat zusätzlich 64 Pixel Abstand oben, damit der Inhalt unter dem vom
 Für Verbraucher-Istwerte gibt es keine Altersprüfung mehr, auch wenn in einer alten Konfiguration eine positive `LoadMaxAge` gespeichert war. Ein dauerhaft unveränderter Wert von 0 bleibt gültig. Vorhandensein, numerischer Typ und endlicher Wert werden weiterhin geprüft; die Rückmeldung muss dem tatsächlichen Geräteverbrauch entsprechen. Zeitstempel werden zur Diagnose angezeigt, sind aber kein Beleg für einen Verbindungsfehler. Die Altersprüfung für Netz, Batterie und SOC bleibt unverändert.
 
 Die Kachel wurde zusätzlich um 1 CSS-Zentimeter nach unten verschoben. Die Geräteliste verwendet kompaktere Zeilen, einen Reihenfolgegriff und dünne türkisfarbene SVG-Symbole nach dem dokumentierten Energie-Manager-Aufbau. Es bleibt eine eigene Peak-Shaving-Darstellung; Nacht-/preisabhängige Energie-Manager-Funktionen gehören nicht dazu.
+
+
+### Version 0.6: Wiederaufladen und direkte Bedienung
+
+Bei gemessenem **SOC 0 %** startet eine persistente Wiederaufladung aus dem Netz mit der maximalen Ladeleistung. Sie endet beim eingestellten Mindest-SOC; bei Mindest-SOC 0 wird bis 5 % geladen, begrenzt durch den maximalen SOC. Ohne SOC-Zuordnung wird dieser Zustand nicht ausgelöst. Lade-/Entladesollwert-Vorzeichen und gemeinsame/getrennte Variablen bleiben berücksichtigt.
+
+Während Wiederaufladung werden Verbraucher zuerst reduziert, auch manuell aktive Geräte und Geräte mit Laufzeitbindungen. Zusätzliche Verbraucher werden nicht eingeschaltet. Danach wird die Batterieladung angefordert. Reicht selbst das Abschalten aller steuerbaren Verbraucher nicht aus, hat das Wiederaufladen Vorrang und kann den Zielnetzbezug überschreiten; dies erscheint im Regelstatus. Wiederaufladung und ihre Zielgrenze werden in der Diagnose sichtbar.
+
+Die Kachel enthält eine Auswahl **Nach Reihenfolge / Gleichmäßig**. Die Auswahl bleibt persistent erhalten. Eine Änderung der Formular-Konfiguration kann sie wieder durch den Formularwert ersetzen. Verteilungswahl, Reihenfolge und Verbrauchermodi lösen bei aktivierter Regelung sofort einen Zyklus aus, auch im Netzänderungsmodus. Dabei wird das ganze Lastbudget neu verteilt, sodass eine veränderte Reihenfolge auch bei ausgeschöpftem Budget tatsächlich andere Sollwerte ergibt. Reduktionen werden vor Erhöhungen geschrieben. Angezeigte Istleistungen folgen weiterhin der realen Messrückmeldung.
+
+Der Kachelinhalt liegt jetzt 0,5 cm höher als in 0.5.1; die Leistungsbeschriftungen haben 8 Pixel Abstand zu ihren Werten. Tahoma bleibt erhalten.

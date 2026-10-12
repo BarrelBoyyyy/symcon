@@ -31,7 +31,7 @@ expect($p['consumers'], [0 => 7], 'three phase conversion');
 $p = PeakPlanner::plan(6000, 5000, 100, 0, 0, 0, [consumer(['Unit' => 'A', 'Max' => 16, 'Min' => 6, 'Step' => 1, 'actual' => 4140])]);
 expect($p['consumers'], [0 => 0], 'minimum charging current');
 $p = PeakPlanner::plan(4500, 5000, 100, 0, 0, 0, [consumer(['Unit' => 'A', 'Max' => 16, 'Min' => 6, 'Step' => 1, 'actual' => 0])]);
-expect($p['consumers'], [0 => 0], 'do not start below minimum budget');
+expect($p['consumers'], [], 'do not start below minimum budget');
 
 // Minimal Symcon simulation exercises module wiring and action writes.
 $GLOBALS['vars'] = [];
@@ -45,6 +45,9 @@ class IPSModule
     public array $attributes = [];
     public array $registered = [];
     public array $formUpdates = [];
+    public function RegisterAttributeBoolean($n, $v) { if (!isset($this->attributes[$n])) $this->attributes[$n] = $v; }
+    public function ReadAttributeBoolean($n) { return $this->attributes[$n]; }
+    public function WriteAttributeBoolean($n, $v) { $this->attributes[$n] = $v; }
     public function RegisterAttributeString($n, $v) { if (!isset($this->attributes[$n])) $this->attributes[$n] = $v; }
     public function ReadAttributeString($n) { return $this->attributes[$n]; }
     public function WriteAttributeString($n, $v) { $this->attributes[$n] = $v; }
@@ -188,7 +191,7 @@ expect($p['consumers'], [0 => 0], 'switch sheds whole load');
 $p = PeakPlanner::plan(1000, 5000, 100, 0, 0, 0, [consumer(['Unit' => 'Switch', 'actual' => 0, 'Max' => 3000])]);
 expect($p['consumers'], [0 => 1], 'switch restores with full budget');
 $p = PeakPlanner::plan(4000, 5000, 100, 0, 0, 0, [consumer(['Unit' => 'Switch', 'actual' => 0, 'Max' => 3000])]);
-expect($p['consumers'], [0 => 0], 'switch stays off with insufficient budget');
+expect($p['consumers'], [], 'switch stays off with insufficient budget');
 // Documented Energy Manager-style consumer options.
 $p = PeakPlanner::plan(6000, 5000, 100, 0, 0, 0, [consumer(['Unit' => 'Scale', 'Max' => 100, 'MaxPower' => 5000, 'Step' => 1, 'actual' => 2500])]);
 expect($p['consumers'], [0 => 30], 'percentage scaling');
@@ -531,4 +534,36 @@ $replayLoads[0]['Max'] = 11000;$replayLoads[0]['Step'] = 100;
 $replay->properties['Consumers'] = json_encode($replayLoads);$replay->ApplyChanges();$GLOBALS['writes'] = [];$replay->Control();
 expect($replay->status, 200, 'wrong watt defaults in ampere mode clearly rejected');
 expect($GLOBALS['writes'], [], 'invalid ampere configuration prevented before commands');
+$recover = new PeakShaving();$recover->Create();
+$recover->properties = array_replace($recover->properties, ['Enabled' => true, 'GridPower' => 300, 'BatteryMode' => 'signed', 'BatterySetpoint' => 301, 'BatteryActual' => 302, 'SOC' => 303, 'MaxCharge' => 2000]);
+variable(300, 5000);variable(301, 0, 10);variable(302, 0);variable(303, 0);variable(304, 4000, 10);
+$recover->properties['Consumers'] = json_encode([consumer(['Setpoint' => 304, 'ActualPower' => 0, 'Max' => 4000, 'Mode' => 'On', 'MinRuntime' => 3600, 'Delay' => 60])]);
+$recover->ApplyChanges();$GLOBALS['writes'] = [];$recover->Control();
+expect($recover->status, 102, 'empty battery recovery operates');
+expect($GLOBALS['writes'][301], -2000, 'empty battery charges from grid');
+expect($GLOBALS['writes'][304], 2000, 'recovery sheds even manual load and runtime hold');
+expect(array_keys($GLOBALS['writes']), [304,301], 'loads reduced before charging command');
+expect($recover->attributes['RecoveryCharging'], true, 'recovery latched at empty SOC');
+variable(303, 10);$recover->Control();
+expect($recover->attributes['RecoveryCharging'], true, 'recovery continues above zero until minimum SOC');
+variable(303, 20);$recover->Control();
+expect($recover->attributes['RecoveryCharging'], false, 'recovery ends at configured minimum');
+$recover->RequestAction('Distribution', 'equal');
+expect(json_decode($recover->visualization,true)['distribution'], 'equal', 'visualization distribution action updates live state');
+$recover->ApplyChanges();
+expect(json_decode($recover->visualization,true)['distribution'], 'equal', 'distribution selection persists across ApplyChanges');
+$recover->properties['Distribution'] = 'equal';$recover->ApplyChanges();
+$recover->RequestAction('Distribution', 'priority');
+expect(json_decode($recover->visualization,true)['distribution'], 'priority', 'switch back to sequence from visualization');
+$swap = new PeakShaving();$swap->Create();
+$swap->properties = array_replace($swap->properties,['Enabled'=>true,'GridPower'=>400,'BatteryMode'=>'signed','BatterySetpoint'=>401,'BatteryActual'=>402,'MaxDischarge'=>3000]);
+variable(400,5000);variable(401,3000,10);variable(402,3000);variable(403,3000,10);variable(404,0,10);
+$swap->properties['Consumers']=json_encode([consumer(['Setpoint'=>403,'ActualPower'=>0,'Max'=>3000,'Priority'=>1]),consumer(['Setpoint'=>404,'ActualPower'=>0,'Max'=>3000,'Priority'=>2])]);
+$swap->ApplyChanges();$GLOBALS['writes']=[];$swap->RequestAction('Reorder','[404,403]');
+expect($GLOBALS['writes'][403],0,'drag reorder releases former priority consumer');
+expect($GLOBALS['writes'][404],3000,'drag reorder assigns watts immediately to new first consumer');
+expect(array_keys($GLOBALS['writes']),[403,404],'drag reorder reduces before increasing');
+$swap->RequestAction('Distribution','equal');
+expect($GLOBALS['writes'][403],1500,'visualization equal mode immediately splits available watts');
+expect($GLOBALS['writes'][404],1500,'visualization equal mode updates second consumer');
 echo "$count Prüfungen bestanden\n";

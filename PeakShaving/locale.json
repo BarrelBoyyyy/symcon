@@ -5,7 +5,6 @@
       "Globale Leistungseinheit": "Globale Leistungseinheit",
       "Watt (W)": "Watt (W)",
       "Kilowatt (kW)": "Kilowatt (kW)",
-      "Alle Leistungs-Messwerte, Sollwerte und Grenzwerte müssen die gewählte Einheit verwenden. Beim Wechsel W/kW vorhandene Werte und externe Variablen selbst umrechnen; Ampere, SOC und Prozent bleiben unverändert.": "Alle Leistungs-Messwerte, Sollwerte und Grenzwerte müssen die gewählte Einheit verwenden. Beim Wechsel W/kW vorhandene Werte und externe Variablen selbst umrechnen; Ampere, SOC und Prozent bleiben unverändert.",
       "Netzleistung ({unit}, positiv = Bezug)": "Netzleistung ({unit}, positiv = Bezug)",
       "Netzleistung: Bezug ist negativ": "Netzleistung: Bezug ist negativ",
       "Zielnetzbezug ({unit})": "Zielnetzbezug ({unit})",
@@ -77,14 +76,17 @@
       "Sollwerte angepasst": "Sollwerte angepasst",
       "Zielnetzbezug mit aktuellen Freigaben / Grenzen nicht erreichbar": "Zielnetzbezug mit aktuellen Freigaben / Grenzen nicht erreichbar",
       "Verbraucher durch Laufzeitbindung gehalten": "Verbraucher durch Laufzeitbindung gehalten",
-      "Verbraucher durch Bedingung gesperrt": "Verbraucher durch Bedingung gesperrt"
+      "Verbraucher durch Bedingung gesperrt": "Verbraucher durch Bedingung gesperrt",
+      "Verteilung auf Verbraucher": "Verteilung auf Verbraucher",
+      "Nach Priorität": "Nach Priorität",
+      "Gleichmäßig verteilen": "Gleichmäßig verteilen",
+      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung"
     },
     "en": {
       "Regelung aktivieren": "Regelung aktivieren",
       "Globale Leistungseinheit": "Globale Leistungseinheit",
       "Watt (W)": "Watt (W)",
       "Kilowatt (kW)": "Kilowatt (kW)",
-      "Alle Leistungs-Messwerte, Sollwerte und Grenzwerte müssen die gewählte Einheit verwenden. Beim Wechsel W/kW vorhandene Werte und externe Variablen selbst umrechnen; Ampere, SOC und Prozent bleiben unverändert.": "Alle Leistungs-Messwerte, Sollwerte und Grenzwerte müssen die gewählte Einheit verwenden. Beim Wechsel W/kW vorhandene Werte und externe Variablen selbst umrechnen; Ampere, SOC und Prozent bleiben unverändert.",
       "Netzleistung ({unit}, positiv = Bezug)": "Netzleistung ({unit}, positiv = Bezug)",
       "Netzleistung: Bezug ist negativ": "Netzleistung: Bezug ist negativ",
       "Zielnetzbezug ({unit})": "Zielnetzbezug ({unit})",
@@ -156,7 +158,11 @@
       "Sollwerte angepasst": "Sollwerte angepasst",
       "Zielnetzbezug mit aktuellen Freigaben / Grenzen nicht erreichbar": "Zielnetzbezug mit aktuellen Freigaben / Grenzen nicht erreichbar",
       "Verbraucher durch Laufzeitbindung gehalten": "Verbraucher durch Laufzeitbindung gehalten",
-      "Verbraucher durch Bedingung gesperrt": "Verbraucher durch Bedingung gesperrt"
+      "Verbraucher durch Bedingung gesperrt": "Verbraucher durch Bedingung gesperrt",
+      "Verteilung auf Verbraucher": "Verteilung auf Verbraucher",
+      "Nach Priorität": "Nach Priorität",
+      "Gleichmäßig verteilen": "Gleichmäßig verteilen",
+      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung"
     }
   }
 }

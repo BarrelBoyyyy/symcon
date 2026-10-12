@@ -21,7 +21,7 @@ final class PeakPlanner
      * globale Leistungseinheit. factor() übersetzt A bzw. skalierte Sollwerte dorthin.
      * Der Netz-Istwert enthält die laufenden Lasten bereits: wir regeln nur Deltas.
      */
-    public static function plan(float $grid, float $target, float $hysteresis, float $battery, float $charge, float $discharge, array $consumers): array
+    public static function plan(float $grid, float $target, float $hysteresis, float $battery, float $charge, float $discharge, array $consumers, string $distribution = 'priority'): array
     {
         // Positive Abweichung: Bezug reduzieren. Negative Abweichung: freies Budget.
         $error = $grid - $target;
@@ -31,6 +31,44 @@ final class PeakPlanner
         $nextBattery = max(-$charge, min($discharge, $battery + $error));
         // Nur zusätzlich angeforderte Entladung reduziert den gemessenen Bezug.
         $remaining = $error - ($nextBattery - $battery);
+        if (!in_array($distribution, ['priority', 'equal'], true)) {
+            throw new RuntimeException('Ungültige Verbraucherverteilung');
+        }
+        if ($distribution === 'equal' && $consumers && abs($remaining) > 0.000000001) {
+            // Gleichmäßige Gesamtleistung (nicht identische Stromwerte): begrenzte
+            // Verbraucher ausschöpfen und deren übriges Budget auf die anderen verteilen.
+            $budget = max(0, array_sum(array_column($consumers, 'actual')) - $remaining);
+            $low = 0.0;
+            $high = 0.0;
+            foreach ($consumers as $c) {
+                $high = max($high, $c['Max'] * self::factor($c));
+            }
+            for ($i = 0; $i < 64; $i++) {
+                $level = ($low + $high) / 2;
+                $used = 0.0;
+                foreach ($consumers as $c) {
+                    $used += min($level, $c['Max'] * self::factor($c));
+                }
+                if ($used > $budget) {
+                    $high = $level;
+                } else {
+                    $low = $level;
+                }
+            }
+            $commands = [];
+            foreach ($consumers as $key => $c) {
+                $wanted = min($c['Max'], $low / self::factor($c));
+                $units = min($c['Max'], floor(($wanted + 0.000000001) / $c['Step']) * $c['Step']);
+                if ($c['Unit'] === 'Switch') {
+                    $units = $wanted + 0.000000001 >= $c['Max'] ? $c['Max'] : 0;
+                }
+                if ($units > 0 && $units < $c['Min']) {
+                    $units = 0;
+                }
+                $commands[$key] = $c['Unit'] === 'Switch' ? ($units > 0 ? 1 : 0) : $units;
+            }
+            return ['battery' => $nextBattery, 'consumers' => $commands];
+        }
         // Größere Prioritätswerte zuerst reduzieren, kleinere zuerst wieder versorgen.
         uasort($consumers, static function (array $a, array $b) use ($remaining): int {
             return $remaining > 0 ? $b['Priority'] <=> $a['Priority'] : $a['Priority'] <=> $b['Priority'];

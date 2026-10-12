@@ -67,6 +67,9 @@ class IPSModule
     public function RegisterVariableFloat($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterVariableString($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterVariableBoolean($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
+    public function EnableAction($ident) {}
+    public function SetVisualizationType($type) {}
+    public function UpdateVisualizationValue($value) { $this->visualization = $value; }
     public function RegisterVariableInteger($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterTimer(...$args) {}
     public function SetTimerInterval($n, $v) { $this->timer = $v; }
@@ -281,7 +284,7 @@ expect($kw->values['Projected'], 5.0, 'kW projected net power avoids double coun
 expect($kw->values['PeakActive'], true, 'peak status true above threshold');
 expect($kw->registered['Grid'], 'PS.Power.kW', 'kW profile assignment');
 expect($GLOBALS['profiles']['PS.Power.kW']['suffix'], ' kW', 'kW profile suffix');
-expect($GLOBALS['profiles']['PS.Power.kW']['digits'], 3, 'kW profile precision');
+expect($GLOBALS['profiles']['PS.Power.kW']['digits'], 2, 'kW profile precision');
 variable(30, 5.05);
 $kw->Control();
 expect($kw->values['PeakActive'], false, 'peak status false inside deadband');
@@ -361,4 +364,51 @@ $c['Mode'] = 'Off';
 $n->properties['Consumers'] = json_encode([$c]);
 $n->ApplyChanges();
 expect($n->values['LoadMode_20'], 'Inaktiv', 'German inactive mode status');
+$e = new PeakShaving();
+$e->Create();
+$e->properties['Enabled'] = true;
+$e->properties['GridPower'] = 70;
+$e->properties['Consumers'] = json_encode([consumer(['Name' => '<Test>', 'Setpoint' => 71, 'ActualPower' => 0, 'Condition' => ' { } '])]);
+variable(70, 7000, 0, 0, 1);
+variable(71, 3000, 10, 0, 1);
+$e->ApplyChanges();
+$e->Control();
+expect($e->status, 102, 'integer grid and empty object condition accepted');
+expect($GLOBALS['writes'][71], 1000, 'consumer without condition and measurement regulates');
+$emptyRoot = [['id' => 0, 'parentID' => 0, 'operation' => 0, 'rules' => ['variable' => [], 'date' => [], 'time' => [], 'dayOfTheWeek' => []]]];
+$e->properties['Consumers'] = json_encode([consumer(['Setpoint' => 71, 'ActualPower' => 72, 'Condition' => json_encode($emptyRoot)])]);
+variable(72, 3000, 0, 0, 1);
+$e->ApplyChanges();
+$e->Control();
+expect($e->status, 102, 'integer consumer measurement and empty condition root accepted');
+$e->properties['BatteryMode'] = 'signed';
+$e->properties['BatterySetpoint'] = 73;
+variable(73, 0, 10);
+$e->Control();
+expect($e->status, 102, 'unselected optional SOC no longer read as ID zero');
+$e->properties['SOC'] = 74;
+variable(74, 50, 0, 0, 1);
+$e->Control();
+expect($e->status, 102, 'integer SOC accepted');
+$p = PeakPlanner::plan(7000, 5000, 100, 0, 0, 0, [consumer(['actual' => 3000]), consumer(['Priority' => 2, 'actual' => 3000])], 'equal');
+expect($p['consumers'], [0 => 2000, 1 => 2000], 'equal load power distribution');
+$p = PeakPlanner::plan(7000, 5000, 100, 0, 0, 0, [consumer(['Max' => 1000, 'actual' => 1000]), consumer(['actual' => 5000])], 'equal');
+expect($p['consumers'], [0 => 1000, 1 => 3000], 'equal distribution reallocates saturated share');
+$e->RequestAction('LoadMode_71', 'Inaktiv');
+expect($e->values['LoadMode_71'], 'Inaktiv', 'visualization mode action uses German label');
+$e->Control();
+expect($GLOBALS['writes'][71], 0, 'visualization manual off controls device');
+$e->RequestAction('Reorder', '[71]');
+expect($e->values['LoadPriority_71'], 1, 'visualization reorder updates priority');
+$e->ApplyChanges();
+expect($e->values['LoadMode_71'], 'Inaktiv', 'runtime mode persists across ApplyChanges');
+$html = $e->GetVisualizationTile();
+expect(str_contains($html, 'function handleMessage'), true, 'HTML SDK live updates present');
+expect(str_contains($html, '__INITIAL_DATA__'), false, 'initial tile state injected');
+$form = json_decode($e->GetConfigurationForm(), true);
+$elements = array_column($form['elements'], null, 'name');
+expect($elements['MaxCharge']['digits'], 0, 'charging limit without decimals');
+expect($elements['Target']['digits'], 2, 'target has two decimals');
+expect($elements['MaxSOC']['maximum'], 100, 'SOC upper UI bound');
+expect($elements['MinSOC']['minimum'], 0, 'SOC lower UI bound');
 echo "$count Prüfungen bestanden\n";

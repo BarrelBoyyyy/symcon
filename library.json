@@ -4,9 +4,9 @@
   "name": "Peak Shaving",
   "url": "https://github.com/BarrelBoyyyy/symcon",
   "compatibility": {
-    "version": "7.0"
+    "version": "7.1"
   },
-  "version": "0.2.1",
-  "build": 3,
-  "date": 1791832873
+  "version": "0.3",
+  "build": 4,
+  "date": 1791837707
 }

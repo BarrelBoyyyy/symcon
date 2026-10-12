@@ -1,6 +1,6 @@
 # Peak Shaving für IP-Symcon
 
-Eigenständiges PHP-Modul für IP-Symcon ab Version 7.0. Ziel ist das Begrenzen des Netzbezugs durch frei zugeordnete Batterie- und Verbrauchervariablen. Orientierung: [Symcon Energie Manager](https://www.symcon.de/de/llms/modules/energy-manager.md). Das Modul ist keine Kopie des Energie Managers und hat noch keinen Funktionstest in einer echten Symcon-Instanz bestanden.
+Eigenständiges PHP-Modul für IP-Symcon ab Version 7.1. Ziel ist das Begrenzen des Netzbezugs durch frei zugeordnete Batterie- und Verbrauchervariablen. Orientierung: [Symcon Energie Manager](https://www.symcon.de/de/llms/modules/energy-manager.md). Das Modul ist keine Kopie des Energie Managers und hat noch keinen Funktionstest in einer echten Symcon-Instanz bestanden.
 
 ## Installation
 
@@ -28,7 +28,7 @@ Die Vorzeichen für Laden, Entladen und den gemeinsamen Sollwert sind separat ko
 
 Die **Istleistung** ist optional und hat eine unabhängig invertierbare Vorzeichenkonvention (standardmäßig Entladen positiv). Ohne Istvariable wird die Leistung aus den Sollwerten geschätzt. Echte Rückmeldung ist vorzuziehen, da Sollwerte nicht zwangsläufig umgesetzt werden.
 
-**SOC** ist eine Messvariable von 0 bis 100 Prozent. Maximale Lade-/Entladeleistung und minimaler/maximaler SOC begrenzen die Befehle. Am minimalen SOC wird nicht entladen, am maximalen nicht geladen. SOC-Schutz gilt auch innerhalb der Netz-Hysterese.
+**SOC** ist eine optionale Messvariable von 0 bis 100 Prozent. Maximale Lade-/Entladeleistung und minimaler/maximaler SOC begrenzen die Befehle. Am minimalen SOC wird nicht entladen, am maximalen nicht geladen. SOC-Schutz gilt auch innerhalb der Netz-Hysterese. Ohne SOC-Variable wird keine ID 0 gelesen und es erfolgt keine SOC-Prüfung; der Speicher muss seine Ladezustandsgrenzen selbst absichern.
 
 Eine optionale **Bereitschaftsvariable** ist lesbar und boolesch oder numerisch, mit frei gewähltem Bereitschaftswert. Bei abweichendem oder veraltetem Status pausiert die gesamte Regelung ohne neue Befehle. Diese Variable dient ausschließlich der Bereitschaft, nicht der Richtungsumschaltung.
 
@@ -77,15 +77,15 @@ Die Mennekes-Option ist eine Protokollanpassung: **1 A darf nur als Stopp gelten
 
 Bei Unterschreitung lädt die Batterie zuerst; Verbraucher werden angehoben, wenn ihre maximale Ladeleistung ausgeschöpft oder Laden durch SOC ausgeschlossen ist. Anders als der Energie Manager kann Peak Shaving mehrere Sollwerte in einem Zyklus verändern. Erzwungene Modus- oder Bedingungsänderungen wirken auf die Netzrückmeldung im folgenden Zyklus.
 
-Statusvariablen zeigen Netzbezug, Regelstatus und **geplanten Netzbezug**. Beim Einheitenwechsel werden vorhandene aktuelle Statuswerte umgerechnet; historische Archivdaten werden nicht umgeschrieben. Leistungsvariablen erhalten eigene Profile `PS.Power.W` bzw. `PS.Power.kW` (0 bzw. 3 Nachkommastellen). **Peak Shaving aktiv** ist nach einem erfolgreichen Regelzyklus wahr, wenn der gemessene Netzbezug über Ziel plus Hysterese liegt; im Totbereich, bei Deaktivierung und bei Fehlern ist sie falsch. Sie meldet den Regelbedarf und bestätigt keine garantierte Leistungsbegrenzung.
+Statusvariablen zeigen Netzbezug, Regelstatus und **geplanten Netzbezug**. Beim Einheitenwechsel werden vorhandene aktuelle Statuswerte umgerechnet; historische Archivdaten werden nicht umgeschrieben. Leistungsvariablen erhalten eigene Profile `PS.Power.W` bzw. `PS.Power.kW` (jeweils zwei Nachkommastellen). **Peak Shaving aktiv** ist nach einem erfolgreichen Regelzyklus wahr, wenn der gemessene Netzbezug über Ziel plus Hysterese liegt; im Totbereich, bei Deaktivierung und bei Fehlern ist sie falsch. Sie meldet den Regelbedarf und bestätigt keine garantierte Leistungsbegrenzung.
 
-Für jeden Verbraucher werden unter der Instanz Variablen für **Aktiv**, **Leistung**, **Status**, **Modus** und **Priorität** angelegt. Aktiv beschreibt den zuletzt angeforderten Betriebszustand (mit Mennekes-Stoppkonvention), Leistung die gemessene oder geschätzte Istleistung des letzten gültigen Zyklus. Modus/Priorität sind lesbare Spiegel der Konfiguration; geändert werden sie in der Verbraucherliste. Entfernte Verbraucher verlieren ihre Statusvariablen beim Übernehmen; historische Daten dieser Variablen können dabei verloren gehen.
+Für jeden Verbraucher werden unter der Instanz Variablen für **Aktiv**, **Leistung**, **Status**, **Modus** und **Priorität** angelegt. Aktiv beschreibt den zuletzt angeforderten Betriebszustand (mit Mennekes-Stoppkonvention), Leistung die gemessene oder geschätzte Istleistung des letzten gültigen Zyklus. Modus und Priorität können über die Verbraucherliste, Variablenaktionen oder die eigene Visualisierung geändert werden. Laufzeitänderungen werden persistent gespeichert und im Formular angezeigt; eine geänderte Verbraucherliste übernimmt wieder die Formularwerte. Entfernte Verbraucher verlieren ihre Statusvariablen beim Übernehmen; historische Daten dieser Variablen können dabei verloren gehen.
 
 Der geplante Netzbezug berücksichtigt ausschließlich Leistungsänderungen: `Netz-Ist − (Batterie-Soll − Batterie-Ist) + Summe(Verbraucher-Sollleistung − Verbraucher-Istleistung)`. Letzterer ist eine Prognose aus Istwerten und Befehlen, kein Messwert. Reicht die verfügbare Flexibilität nicht aus, wird dies gemeldet.
 
 Abtastintervall, Geräteverzögerung, Laufzeitbindungen, manuelle Modi und Stromschritte können Überschreitungen verursachen. Ohne reale Leistungsmessungen sind die Berechnungen Schätzungen. Bereits gesendete Befehle werden bei Mess- oder Aktionsfehlern nicht automatisch zurückgenommen. Dies ist keine elektrische Schutzfunktion.
 
-Nicht Bestandteil dieser Version: eigene Energie-Manager-Visualisierung, Nacht-/preisabhängiges Laden, dynamische Phasenumschaltung, Gerätevorlagen, Einschränkungen nach §14a/§9 und indirekt geregelte Batteriespeicher.
+Nicht Bestandteil dieser Version: die eingebaute Energie-Manager-Darstellung und deren Nacht-/preisabhängiges Laden, dynamische Phasenumschaltung, Gerätevorlagen, Einschränkungen nach §14a/§9 und indirekt geregelte Batteriespeicher.
 
 ## Entwicklung
 
@@ -104,3 +104,14 @@ Dokumentationsgrundlagen: [Energie Manager](https://www.symcon.de/de/llms/module
 ### Version 0.2.1
 
 Die dynamische Aktualisierung der Verbraucherspalten übergibt JSON statt eines PHP-Arrays an Symcon. Dadurch wird der Fehler „Cannot auto-convert value for parameter Value“ beim Wechsel von Einheit oder Batteriemodus vermieden. Alle vom Modul bereitgestellten Beschriftungen und Modus-Anzeigen sind deutsch, auch bei englischer Konsolensprache. Systemmeldungen von Symcon selbst folgen weiterhin dessen Spracheinstellung.
+
+
+### Version 0.3: Testumgebung und Visualisierung
+
+Leere Bedingungen (auch `{}` und leere SelectCondition-Wurzelknoten) gelten als freigegeben. Netzleistung bleibt erforderlich und meldet ihren Namen bei fehlender Zuordnung. Optionale Messwerte werden nicht mit ID 0 gelesen. Messwerte dürfen Integer oder Float sein. Lade-/Entladegrenzen werden ohne Nachkommastellen eingegeben, andere Leistungsfelder mit zwei; SOC-Felder sind auf 0–100 begrenzt.
+
+**Verteilung auf Verbraucher** wählt Priorisierung oder gleichmäßige Gesamtleistung. Gleichmäßig bedeutet Wasserfüllung: Bei Leistungsgrenzen wird freies Budget auf die anderen Verbraucher verteilt. Unterschiedliche Phasen, Schrittweiten, Mindestleistung, Bedingungen, Laufzeiten und manuelle Modi können exakte Gleichheit verhindern. Die Batterie gleicht weiterhin zuerst die Netzabweichung aus.
+
+In der Kachelvisualisierung die Instanz hinzufügen und ihre **individuelle Darstellung** verwenden. Die eigene HTML-Kachel orientiert sich an der dokumentierten Energie-Manager-Geräteliste: Reihenfolge verschieben, Automatisch/Aktiv/Inaktiv, Einstellungen und Live-Leistung. Prioritäten lassen sich auch über Pfeile ändern. Die Batterie zeigt Lade-/Entladerichtung und Leistung; sie wird weiterhin automatisch geregelt. Der Einstellungsdialog dient Modus/Priorität; zeit-/preisabhängige Energie-Manager-Funktionen werden nicht nachgebildet. Bei gleichmäßiger Verteilung wirkt die Reihenfolge nicht auf die Leistungszuteilung. Die Kachel ist eine eigene Implementierung, kein unverändert übernommenes Symcon-Kernlayout.
+
+Die HTML-Darstellung wurde mit Chromium hinsichtlich Geräteliste, Modusaktionen, Liveupdates und Prioritätenreihenfolge geprüft. Die Kommunikation mit einer echten Symcon-Kachel muss weiterhin in der Testumgebung überprüft werden.

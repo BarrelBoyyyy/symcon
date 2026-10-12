@@ -4,12 +4,12 @@ Eigenständiges PHP-Modul für IP-Symcon ab Version 7.0. Ziel ist das Begrenzen 
 
 ## Installation
 
-Dieses Repository über die Modulverwaltung von IP-Symcon als Git-Modul hinzufügen und eine Instanz **Peak Shaving** erstellen. Die Regelung startet deaktiviert. Variablen zuordnen und Grenzwerte prüfen, dann aktivieren. Die Aktion **Jetzt regeln** arbeitet ebenfalls nur bei aktivierter Regelung. Dieselben Geräte sollten nicht parallel von einem weiteren Energie Manager gesteuert werden.
+Dieses Repository über die Modulverwaltung von IP-Symcon als Git-Modul hinzufügen und eine Instanz **Peak Shaving** erstellen. Die Regelung startet deaktiviert. Unter **Globale Leistungseinheit** zwischen W (Standard) und kW wählen. Alle externen Leistungs-Mess-/Aktionsvariablen und Leistungsgrenzen müssen dieselbe Einheit verwenden. Beim Wechsel die bestehenden Grenzwerte selbst umrechnen (5.000 W → 5 kW); Ampere, skalierte Sollwerte und SOC werden nicht umgerechnet. Dezimale Leistungs-Sollwerte benötigen Float-Aktionsvariablen. Variablen zuordnen und Grenzwerte prüfen, dann aktivieren. Die Aktion **Jetzt regeln** arbeitet ebenfalls nur bei aktivierter Regelung. Dieselben Geräte sollten nicht parallel von einem weiteren Energie Manager gesteuert werden.
 
 ## Netzbezug
 
-- **Netzleistung:** Messvariable in Watt. Standardmäßig ist Bezug positiv und Einspeisung negativ; invertierbar.
-- **Zielnetzbezug:** gewünschter Bezug in Watt, beispielsweise 5.000 W.
+- **Netzleistung:** Messvariable in der ausgewählten Leistungseinheit. Standardmäßig ist Bezug positiv und Einspeisung negativ; invertierbar.
+- **Zielnetzbezug:** gewünschter Bezug, beispielsweise 5.000 W oder 5 kW.
 - **Hysterese:** symmetrischer Totbereich. Bei 5.000 W Ziel und 100 W Hysterese werden zwischen 4.900 und 5.100 W keine normalen Anpassungen durchgeführt.
 - **Intervall:** standardmäßig 5 Sekunden, passend zur Geräteverzögerung wählen.
 - **Maximales Messwertalter:** standardmäßig 60 Sekunden. Fehlende oder veraltete ausgewählte Messwerte stoppen die Regelung ohne neue Befehle; alte Sollwerte bleiben bestehen.
@@ -21,8 +21,8 @@ Die Batterie ist optional. Es wird keine Geräteinstanz benötigt. Zwei Variante
 
 | Variante | Zuordnung |
 | --- | --- |
-| Getrennte Variablen (Standard) | Lade- und Entladesollwert in Watt, jeweils mit Symcon-Aktion |
-| Gemeinsamer Sollwert | Vorzeichenbehafteter Leistungssollwert in Watt, mit Symcon-Aktion |
+| Getrennte Variablen (Standard) | Lade- und Entladesollwert in W bzw. kW, jeweils mit Symcon-Aktion |
+| Gemeinsamer Sollwert | Vorzeichenbehafteter Leistungssollwert in W bzw. kW, mit Symcon-Aktion |
 
 Die Vorzeichen für Laden, Entladen und den gemeinsamen Sollwert sind separat konfigurierbar. Bei gemeinsamem Sollwert gilt standardmäßig Entladen positiv, Laden negativ.
 
@@ -30,10 +30,9 @@ Die **Istleistung** ist optional und hat eine unabhängig invertierbare Vorzeich
 
 **SOC** ist eine Messvariable von 0 bis 100 Prozent. Maximale Lade-/Entladeleistung und minimaler/maximaler SOC begrenzen die Befehle. Am minimalen SOC wird nicht entladen, am maximalen nicht geladen. SOC-Schutz gilt auch innerhalb der Netz-Hysterese.
 
-Zwei unterschiedliche Statusfunktionen sind optional:
+Eine optionale **Bereitschaftsvariable** ist lesbar und boolesch oder numerisch, mit frei gewähltem Bereitschaftswert. Bei abweichendem oder veraltetem Status pausiert die gesamte Regelung ohne neue Befehle. Diese Variable dient ausschließlich der Bereitschaft, nicht der Richtungsumschaltung.
 
-- **Bereitschaft:** lesbare boolesche oder numerische Statusvariable und frei gewählter Bereitschaftswert (boolesch: 0 oder 1). Bei abweichendem oder veraltetem Status pausiert die gesamte Regelung ohne neue Befehle.
-- **Umschalten Laden/Entladen:** beschreibbare Aktionsvariable mit frei gewählten Werten für Laden, Entladen und Passiv. Vor einem Moduswechsel werden die Leistungssollwerte auf 0 gesetzt. Bei getrennten Sollwerten wird auch ohne Statusvariable zuerst die Gegenrichtung gestoppt.
+Eine zusätzliche Umschaltvariable wird nicht mehr verwendet. Bei einem gemeinsamen Sollwert bestimmt ausschließlich das konfigurierbare Vorzeichen die Lade-/Entladerichtung; 0 ist passiv. Die getrennten Sollwertselektoren sind dann verborgen. Beim Wechsel zu getrennten Variablen werden nur diese beiden Selektoren angezeigt. Zuerst wird die Gegenrichtung auf 0 gesetzt; bei einem fehlgeschlagenen Stopp wird die neue Richtung nicht gestartet. Alte Umschalt-Einstellungen werden ignoriert.
 
 Die Sollwertaktionen müssen die Batterie tatsächlich steuern. Zusätzliche gerätespezifische Freigaben, Kommunikationsprotokolle oder Bestätigungen werden von der Geräteanbindung bereitgestellt. Der Wechsel erfolgt nach erfolgreicher Ausführung der Symcon-Aktion; eine geräteseitige Quittierung oder Totzeit wird nicht automatisch abgewartet. Die Batterie muss ihre eigenen Schutzfunktionen behalten.
 
@@ -44,11 +43,11 @@ Die Liste folgt den grundlegenden Möglichkeiten des Energie Managers: schaltbar
 | Einstellung | Bedeutung |
 | --- | --- |
 | Aktionsvariable | Numerischer Sollwert oder bei Ein/Aus eine boolesche Aktionsvariable |
-| Aktueller Verbrauch | Optionaler Messwert in Watt; sonst Schätzung aus Sollwert und Konfiguration |
+| Aktueller Verbrauch | Optionaler Messwert in W/kW; sonst Schätzung aus Sollwert und Konfiguration |
 | Einheit | Watt, Ampere, Ein/Aus oder skalierter Sollwert (beispielsweise Prozent) |
 | Priorität | Kleine Werte werden zuerst versorgt; große Werte werden zuerst reduziert |
-| Maximum / Minimum | Grenzen in der gewählten Sollwerteinheit; bei Ein/Aus ist Maximum die Einschaltleistung in Watt |
-| Maximaler Verbrauch bei Skalierung | Leistung in Watt am maximalen Sollwert; lineare Skalierung ab 0 |
+| Maximum / Minimum | Grenzen in der gewählten Sollwerteinheit; bei Ein/Aus ist Maximum die Einschaltleistung in W/kW |
+| Maximaler Verbrauch bei Skalierung | Leistung in W/kW am maximalen Sollwert; lineare Skalierung ab 0 |
 | Schrittweite | Beispielsweise 100 W, 1 A oder 1 Prozentpunkt |
 | Spannung / Phasen | Umrechnung von Ampere nach Watt; feste Phasenzahl |
 | Watt pro Phase | Watt-Sollwerte pro Phase statt Gesamtleistung |
@@ -78,7 +77,11 @@ Die Mennekes-Option ist eine Protokollanpassung: **1 A darf nur als Stopp gelten
 
 Bei Unterschreitung lädt die Batterie zuerst; Verbraucher werden angehoben, wenn ihre maximale Ladeleistung ausgeschöpft oder Laden durch SOC ausgeschlossen ist. Anders als der Energie Manager kann Peak Shaving mehrere Sollwerte in einem Zyklus verändern. Erzwungene Modus- oder Bedingungsänderungen wirken auf die Netzrückmeldung im folgenden Zyklus.
 
-Statusvariablen zeigen Netzbezug, Regelstatus und **geplanten Netzbezug**. Letzterer ist eine Prognose aus Istwerten und Befehlen, kein Messwert. Reicht die verfügbare Flexibilität nicht aus, wird dies gemeldet.
+Statusvariablen zeigen Netzbezug, Regelstatus und **geplanten Netzbezug**. Beim Einheitenwechsel werden vorhandene aktuelle Statuswerte umgerechnet; historische Archivdaten werden nicht umgeschrieben. Leistungsvariablen erhalten eigene Profile `PS.Power.W` bzw. `PS.Power.kW` (0 bzw. 3 Nachkommastellen). **Peak Shaving aktiv** ist nach einem erfolgreichen Regelzyklus wahr, wenn der gemessene Netzbezug über Ziel plus Hysterese liegt; im Totbereich, bei Deaktivierung und bei Fehlern ist sie falsch. Sie meldet den Regelbedarf und bestätigt keine garantierte Leistungsbegrenzung.
+
+Für jeden Verbraucher werden unter der Instanz Variablen für **Aktiv**, **Leistung**, **Status**, **Modus** und **Priorität** angelegt. Aktiv beschreibt den zuletzt angeforderten Betriebszustand (mit Mennekes-Stoppkonvention), Leistung die gemessene oder geschätzte Istleistung des letzten gültigen Zyklus. Modus/Priorität sind lesbare Spiegel der Konfiguration; geändert werden sie in der Verbraucherliste. Entfernte Verbraucher verlieren ihre Statusvariablen beim Übernehmen; historische Daten dieser Variablen können dabei verloren gehen.
+
+Der geplante Netzbezug berücksichtigt ausschließlich Leistungsänderungen: `Netz-Ist − (Batterie-Soll − Batterie-Ist) + Summe(Verbraucher-Sollleistung − Verbraucher-Istleistung)`. Letzterer ist eine Prognose aus Istwerten und Befehlen, kein Messwert. Reicht die verfügbare Flexibilität nicht aus, wird dies gemeldet.
 
 Abtastintervall, Geräteverzögerung, Laufzeitbindungen, manuelle Modi und Stromschritte können Überschreitungen verursachen. Ohne reale Leistungsmessungen sind die Berechnungen Schätzungen. Bereits gesendete Befehle werden bei Mess- oder Aktionsfehlern nicht automatisch zurückgenommen. Dies ist keine elektrische Schutzfunktion.
 
@@ -92,7 +95,7 @@ php -l PeakShaving/Controller.php
 php tests/run.php
 ```
 
-Die Tests prüfen die Leistungsberechnung und simulierte Symcon-Aktionsaufrufe einschließlich Vorzeichen, SOC, Prioritäten, Ampere-/Prozentskalierung, Mindeststrom, Mennekes-Anpassung, Bedingungen, Laufzeiten, Verzögerung, manuellen Modi, veralteten Messwerten, Statusumschaltung und Aktionsfehlern. Oberfläche, Gerätetreiber und Timerverhalten müssen in einer echten Symcon-Instanz validiert werden.
+Die Tests prüfen die Leistungsberechnung und simulierte Symcon-Aktionsaufrufe einschließlich Vorzeichen, SOC, Prioritäten, Ampere-/Prozentskalierung, Mindeststrom, Mennekes-Anpassung, Bedingungen, Laufzeiten, Verzögerung, manuellen Modi, veralteten Messwerten, automatischer Vorzeichenrichtung und Aktionsfehlern. Oberfläche, Gerätetreiber und Timerverhalten müssen in einer echten Symcon-Instanz validiert werden.
 
 In der Cloud-Umgebung liegt PHP unter `/workspace/peak-tools/php/usr/bin/php8.4`. `LD_LIBRARY_PATH=/workspace/peak-tools/php/usr/lib/x86_64-linux-gnu` setzen und den Interpreter mit `-n` aufrufen.
 

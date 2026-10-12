@@ -41,6 +41,15 @@ class IPSModule
     public array $properties = [];
     public array $values = [];
     public array $buffers = [];
+    public array $attributes = [];
+    public array $registered = [];
+    public array $formUpdates = [];
+    public function RegisterAttributeString($n, $v) { if (!isset($this->attributes[$n])) $this->attributes[$n] = $v; }
+    public function ReadAttributeString($n) { return $this->attributes[$n]; }
+    public function WriteAttributeString($n, $v) { $this->attributes[$n] = $v; }
+    public function Translate($s) { return $s; }
+    public function UpdateFormField($n, $f, $v) { $this->formUpdates[$n][$f] = $v; }
+    public function UnregisterVariable($n) { unset($this->registered[$n], $this->values[$n]); }
     public function GetBuffer($n) { return $this->buffers[$n] ?? ''; }
     public function SetBuffer($n, $v) { $this->buffers[$n] = $v; }
     public int $status = 0;
@@ -55,14 +64,22 @@ class IPSModule
     public function ReadPropertyInteger($n) { return $this->properties[$n]; }
     public function ReadPropertyFloat($n) { return $this->properties[$n]; }
     public function ReadPropertyString($n) { return $this->properties[$n]; }
-    public function RegisterVariableFloat(...$args) {}
-    public function RegisterVariableString(...$args) {}
+    public function RegisterVariableFloat($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
+    public function RegisterVariableString($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
+    public function RegisterVariableBoolean($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
+    public function RegisterVariableInteger($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterTimer(...$args) {}
     public function SetTimerInterval($n, $v) { $this->timer = $v; }
     public function SetStatus($v) { $this->status = $v; }
+    public function GetValue($n) { return $this->values[$n] ?? 0; }
     public function SetValue($n, $v) { $this->values[$n] = $v; }
     public function SendDebug(...$args) {}
 }
+function IPS_VariableProfileExists($name) { return isset($GLOBALS['profiles'][$name]); }
+function IPS_CreateVariableProfile($name, $type) { $GLOBALS['profiles'][$name] = ['type' => $type]; }
+function IPS_SetVariableProfileText($name, $prefix, $suffix) { $GLOBALS['profiles'][$name]['suffix'] = $suffix; }
+function IPS_SetVariableProfileDigits($name, $digits) { $GLOBALS['profiles'][$name]['digits'] = $digits; }
+function IPS_SetVariableProfileValues(...$args) {}
 function IPS_VariableExists($id) { return isset($GLOBALS['vars'][$id]); }
 function IPS_GetVariable($id) { return $GLOBALS['vars'][$id]; }
 function GetValue($id) { return $GLOBALS['vars'][$id]['value']; }
@@ -231,7 +248,7 @@ $n->properties['InvertGrid'] = true;
 variable(1, -5000);
 $n->Control();
 expect($n->values['Grid'], 5000, 'grid sign inversion');
-// Optional measured battery output and a writable operating-mode variable.
+// Optional measured battery output; legacy mode-switch properties must be ignored.
 $m->properties['BatteryStatus'] = 0;
 $m->properties['BatteryActual'] = 0;
 $m->properties['BatteryModeVariable'] = 10;
@@ -241,7 +258,7 @@ variable(8, 0, 10);
 variable(1, 7000);
 $GLOBALS['writes'] = [];
 $m->Control();
-expect($GLOBALS['writes'], [7 => 0, 10 => 2, 8 => 1000], 'mode switch stops charging before discharge; estimated actual');
+expect($GLOBALS['writes'], [7 => 0, 8 => 1000], 'sign determines direction; legacy mode variable is never written');
 variable(7, -1000, 10);
 variable(8, 0, 10);
 variable(10, 1, 10, 0, 1);
@@ -251,4 +268,82 @@ $m->Control();
 expect($m->status, 200, 'failed action reported');
 expect($GLOBALS['writes'], [], 'failed stop prevents mode change and opposite direction');
 $GLOBALS['failAction'] = 0;
+// Physically identical W and kW scenarios must produce identical outcomes.
+$kw = new PeakShaving();
+$kw->Create();
+$kw->properties = array_replace($kw->properties, ['Enabled' => true, 'PowerUnit' => 'kW', 'GridPower' => 30, 'Target' => 5.0, 'Hysteresis' => 0.1, 'MaxDischarge' => 3.0, 'MaxCharge' => 3.0, 'BatteryMode' => 'signed', 'BatterySetpoint' => 31, 'BatteryActual' => 32, 'SOC' => 33]);
+variable(30, 7.0); variable(31, 0, 10); variable(32, 0); variable(33, 50);
+$kw->ApplyChanges();
+$kw->Control();
+expect($GLOBALS['writes'][31], 2.0, 'kW battery output');
+expect($kw->values['Grid'], 7.0, 'kW grid display');
+expect($kw->values['Projected'], 5.0, 'kW projected net power avoids double counting');
+expect($kw->values['PeakActive'], true, 'peak status true above threshold');
+expect($kw->registered['Grid'], 'PS.Power.kW', 'kW profile assignment');
+expect($GLOBALS['profiles']['PS.Power.kW']['suffix'], ' kW', 'kW profile suffix');
+expect($GLOBALS['profiles']['PS.Power.kW']['digits'], 3, 'kW profile precision');
+variable(30, 5.05);
+$kw->Control();
+expect($kw->values['PeakActive'], false, 'peak status false inside deadband');
+variable(30, 7, 0, 1000);
+$kw->Control();
+expect($kw->values['PeakActive'], false, 'peak status clears on error');
+variable(30, 7);
+$kw->properties['BatterySetpoint'] = 0;
+variable(34, 10, 10, 0, 1);
+variable(35, 6.9);
+$c = consumer(['Setpoint' => 34, 'ActualPower' => 35, 'Unit' => 'A', 'Max' => 16, 'Min' => 6, 'Step' => 1, 'ZeroToOne' => false]);
+$kw->properties['Consumers'] = json_encode([$c]);
+$kw->ApplyChanges();
+$kw->Control();
+expect($GLOBALS['writes'][34], 7, 'kW conversion preserves ampere commands');
+expect(round($kw->values['Projected'], 2), 4.93, 'kW consumer delta accounting');
+expect($kw->values['LoadPower_34'], 6.9, 'load status power in kW');
+expect($kw->values['LoadActive_34'], true, 'load command active status');
+expect($kw->values['LoadPriority_34'], 1, 'load configuration priority variable');
+expect($kw->registered['LoadPower_34'], 'PS.Power.kW', 'load power profile');
+$kw->properties['Consumers'] = '[]';
+$kw->ApplyChanges();
+expect(isset($kw->registered['LoadPower_34']), false, 'removed load variables cleaned up');
+$kw->properties['Enabled'] = false;
+$kw->Control();
+expect($kw->values['PeakActive'], false, 'disabled peak status');
+$kw->properties['BatteryMode'] = 'signed';
+$form = json_decode($kw->GetConfigurationForm(), true);
+$elements = array_column($form['elements'], null, 'name');
+expect($elements['BatterySetpoint']['visible'], true, 'combined variable visible');
+expect($elements['BatteryCharge']['visible'], false, 'charge variable hidden in combined mode');
+expect($elements['BatteryDischarge']['visible'], false, 'discharge variable hidden in combined mode');
+expect(str_contains($elements['Target']['caption'], 'kW'), true, 'form unit labels');
+expect(isset($elements['BatteryModeVariable']), false, 'no mode-switch selector');
+$kw->ConfigureForm('separate', 'W');
+expect($kw->formUpdates['BatterySetpoint']['visible'], false, 'live form hides combined variable');
+expect($kw->formUpdates['BatteryCharge']['visible'], true, 'live form shows separate variable');
+expect($kw->formUpdates['Target']['caption'], 'Zielnetzbezug (W)', 'live form unit change');
+$kw->properties['Enabled'] = true;
+$kw->properties['BatteryMode'] = 'signed';
+$kw->properties['BatterySetpoint'] = 31;
+variable(30, 6.001);
+variable(31, 0, 10);
+$kw->Control();
+expect(round($GLOBALS['writes'][31], 6), 1.001, 'small kW output not lost to rounding tolerance');
+// Fractional kW cannot be represented by integer action variables.
+variable(31, 0, 10, 0, 1);
+$GLOBALS['writes'] = [];
+$kw->Control();
+expect($kw->status, 200, 'integer kW actuator rejected instead of silently rounded');
+expect($GLOBALS['writes'], [], 'no inaccurate integer command sent');
+$kw->properties['PowerUnit'] = 'W';
+$kw->values['Grid'] = 7.0;
+$kw->values['Projected'] = 5.0;
+$kw->ApplyChanges();
+expect($kw->values['Grid'], 7000, 'existing grid status scales on unit switch');
+expect($kw->values['Projected'], 5000, 'existing projected status scales on unit switch');
+expect($kw->registered['Grid'], 'PS.Power.W', 'W profile restored');
+$kw->ApplyChanges();
+expect($kw->values['Grid'], 7000, 'repeat ApplyChanges does not double scale');
+$kw->properties['PowerUnit'] = 'invalid';
+$kw->ApplyChanges();
+expect($kw->status, 200, 'invalid unit reported');
+expect($kw->timer, 0, 'invalid unit prevents timer startup');
 echo "$count checks passed\n";

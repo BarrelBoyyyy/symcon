@@ -6,9 +6,29 @@
       "caption": "Regelung aktivieren"
     },
     {
+      "type": "Select",
+      "name": "PowerUnit",
+      "caption": "Globale Leistungseinheit",
+      "options": [
+        {
+          "caption": "Watt (W)",
+          "value": "W"
+        },
+        {
+          "caption": "Kilowatt (kW)",
+          "value": "kW"
+        }
+      ],
+      "onChange": "PS_ConfigureForm($id, $BatteryMode, $PowerUnit);"
+    },
+    {
+      "type": "Label",
+      "caption": "Alle Leistungs-Messwerte, Sollwerte und Grenzwerte müssen die gewählte Einheit verwenden. Beim Wechsel W/kW vorhandene Werte und externe Variablen selbst umrechnen; Ampere, SOC und Prozent bleiben unverändert."
+    },
+    {
       "type": "SelectVariable",
       "name": "GridPower",
-      "caption": "Netzleistung (W, positiv = Bezug)"
+      "caption": "Netzleistung ({unit}, positiv = Bezug)"
     },
     {
       "type": "CheckBox",
@@ -18,12 +38,14 @@
     {
       "type": "NumberSpinner",
       "name": "Target",
-      "caption": "Zielnetzbezug (W)"
+      "caption": "Zielnetzbezug ({unit})",
+      "digits": 3
     },
     {
       "type": "NumberSpinner",
       "name": "Hysteresis",
-      "caption": "Hysterese ± W"
+      "caption": "Hysterese ± {unit}",
+      "digits": 3
     },
     {
       "type": "NumberSpinner",
@@ -57,17 +79,18 @@
           "caption": "Gemeinsamer Leistungssollwert",
           "value": "signed"
         }
-      ]
+      ],
+      "onChange": "PS_ConfigureForm($id, $BatteryMode, $PowerUnit);"
     },
     {
       "type": "SelectVariable",
       "name": "BatteryCharge",
-      "caption": "Laden: Leistungssollwert (W)"
+      "caption": "Laden: Leistungssollwert ({unit})"
     },
     {
       "type": "SelectVariable",
       "name": "BatteryDischarge",
-      "caption": "Entladen: Leistungssollwert (W)"
+      "caption": "Entladen: Leistungssollwert ({unit})"
     },
     {
       "type": "CheckBox",
@@ -92,27 +115,31 @@
     {
       "type": "CheckBox",
       "name": "InvertBatteryCommand",
-      "caption": "Gemeinsamer Sollwert: positiv = Laden"
+      "caption": "Gemeinsamer Sollwert: positiv = Laden",
+      "visible": false
     },
     {
       "type": "SelectVariable",
       "name": "BatteryActual",
-      "caption": "Batterie-Istleistung (W, optional – sonst aus Sollwerten geschätzt)"
+      "caption": "Batterie-Istleistung ({unit}, optional – sonst aus Sollwerten geschätzt)"
     },
     {
       "type": "SelectVariable",
       "name": "BatterySetpoint",
-      "caption": "Batterie-Leistungssollwert (W)"
+      "caption": "Batterie-Leistungssollwert ({unit})",
+      "visible": false
     },
     {
       "type": "NumberSpinner",
       "name": "MaxDischarge",
-      "caption": "Maximale Entladeleistung (W)"
+      "caption": "Maximale Entladeleistung ({unit})",
+      "digits": 3
     },
     {
       "type": "NumberSpinner",
       "name": "MaxCharge",
-      "caption": "Maximale Ladeleistung (W)"
+      "caption": "Maximale Ladeleistung ({unit})",
+      "digits": 3
     },
     {
       "type": "NumberSpinner",
@@ -162,7 +189,7 @@
         },
         {
           "name": "ActualPower",
-          "caption": "Aktueller Verbrauch W (optional)",
+          "caption": "Aktueller Verbrauch {unit} (optional)",
           "width": "180px",
           "add": 0,
           "edit": {
@@ -207,11 +234,12 @@
         },
         {
           "name": "Max",
-          "caption": "Maximum (Ein/Aus: Einschaltleistung W)",
+          "caption": "Maximum (Ein/Aus: Einschaltleistung {unit})",
           "width": "180px",
           "add": 11000,
           "edit": {
-            "type": "NumberSpinner"
+            "type": "NumberSpinner",
+            "digits": 3
           }
         },
         {
@@ -220,7 +248,8 @@
           "width": "180px",
           "add": 0,
           "edit": {
-            "type": "NumberSpinner"
+            "type": "NumberSpinner",
+            "digits": 3
           }
         },
         {
@@ -229,7 +258,8 @@
           "width": "180px",
           "add": 100,
           "edit": {
-            "type": "NumberSpinner"
+            "type": "NumberSpinner",
+            "digits": 3
           }
         },
         {
@@ -261,16 +291,17 @@
         },
         {
           "name": "MaxPower",
-          "caption": "Maximaler Verbrauch W (skalierter Sollwert)",
+          "caption": "Maximaler Verbrauch {unit} (skalierter Sollwert)",
           "width": "180px",
           "add": 5000,
           "edit": {
-            "type": "NumberSpinner"
+            "type": "NumberSpinner",
+            "digits": 3
           }
         },
         {
           "name": "PerPhaseW",
-          "caption": "Watt-Sollwert pro Phase",
+          "caption": "Leistungs-Sollwert pro Phase",
           "width": "180px",
           "add": false,
           "edit": {
@@ -355,26 +386,6 @@
           }
         }
       ]
-    },
-    {
-      "type": "SelectVariable",
-      "name": "BatteryModeVariable",
-      "caption": "Batterie: Variable zum Umschalten Laden/Entladen (optional)"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "BatteryChargingValue",
-      "caption": "Umschaltwert Laden"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "BatteryDischargingValue",
-      "caption": "Umschaltwert Entladen"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "BatteryIdleValue",
-      "caption": "Umschaltwert Passiv"
     }
   ],
   "actions": [

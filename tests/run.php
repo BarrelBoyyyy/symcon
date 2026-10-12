@@ -48,7 +48,7 @@ class IPSModule
     public function ReadAttributeString($n) { return $this->attributes[$n]; }
     public function WriteAttributeString($n, $v) { $this->attributes[$n] = $v; }
     public function Translate($s) { return $s; }
-    public function UpdateFormField($n, $f, $v) { $this->formUpdates[$n][$f] = $v; }
+    public function UpdateFormField($n, $f, $v) { if (!is_scalar($v)) throw new RuntimeException('Formularwerte müssen skalare Werte oder JSON-Zeichenketten sein'); $this->formUpdates[$n][$f] = $v; }
     public function UnregisterVariable($n) { unset($this->registered[$n], $this->values[$n]); }
     public function GetBuffer($n) { return $this->buffers[$n] ?? ''; }
     public function SetBuffer($n, $v) { $this->buffers[$n] = $v; }
@@ -346,4 +346,19 @@ $kw->properties['PowerUnit'] = 'invalid';
 $kw->ApplyChanges();
 expect($kw->status, 200, 'invalid unit reported');
 expect($kw->timer, 0, 'invalid unit prevents timer startup');
-echo "$count checks passed\n";
+$kw->ConfigureForm('signed', 'kW');
+$columns = json_decode($kw->formUpdates['Consumers']['columns'], true, 512, JSON_THROW_ON_ERROR);
+expect(is_array($columns), true, 'list columns sent as JSON string');
+expect($columns[2]['caption'], 'Aktueller Verbrauch kW (optional)', 'German dynamic unit caption');
+$n->properties['Consumers'] = json_encode([$c = consumer(['Setpoint' => 20, 'ActualPower' => 0, 'Unit' => 'Switch', 'Mode' => 'Auto'])]);
+$n->ApplyChanges();
+expect($n->values['LoadMode_20'], 'Automatisch', 'German automatic mode status');
+$c['Mode'] = 'On';
+$n->properties['Consumers'] = json_encode([$c]);
+$n->ApplyChanges();
+expect($n->values['LoadMode_20'], 'Aktiv', 'German active mode status');
+$c['Mode'] = 'Off';
+$n->properties['Consumers'] = json_encode([$c]);
+$n->ApplyChanges();
+expect($n->values['LoadMode_20'], 'Inaktiv', 'German inactive mode status');
+echo "$count Prüfungen bestanden\n";

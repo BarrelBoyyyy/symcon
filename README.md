@@ -100,3 +100,7 @@ Die Tests prüfen die Leistungsberechnung und simulierte Symcon-Aktionsaufrufe e
 In der Cloud-Umgebung liegt PHP unter `/workspace/peak-tools/php/usr/bin/php8.4`. `LD_LIBRARY_PATH=/workspace/peak-tools/php/usr/lib/x86_64-linux-gnu` setzen und den Interpreter mit `-n` aufrufen.
 
 Dokumentationsgrundlagen: [Energie Manager](https://www.symcon.de/de/llms/modules/energy-manager.md), [PHP-SDK](https://www.symcon.de/de/llms/developer/sdk-tools/sdk-php/module.md), [Konfigurationsformulare](https://www.symcon.de/de/llms/developer/sdk-tools/sdk-php/configuration-forms.md) und [Variablenaktionen](https://www.symcon.de/de/llms/functions/access-variables.md).
+
+### Version 0.2.1
+
+Die dynamische Aktualisierung der Verbraucherspalten übergibt JSON statt eines PHP-Arrays an Symcon. Dadurch wird der Fehler „Cannot auto-convert value for parameter Value“ beim Wechsel von Einheit oder Batteriemodus vermieden. Alle vom Modul bereitgestellten Beschriftungen und Modus-Anzeigen sind deutsch, auch bei englischer Konsolensprache. Systemmeldungen von Symcon selbst folgen weiterhin dessen Spracheinstellung.

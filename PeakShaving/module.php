@@ -143,9 +143,14 @@ class PeakShaving extends IPSModule
                 $this->UpdateFormField($element['name'], 'caption', str_replace('{unit}', $unit, $this->Translate($element['caption'])));
             }
             if (($element['name'] ?? '') === 'Consumers') {
-                $this->UpdateFormField('Consumers', 'columns', $this->loadFormUnit($element, $unit)['columns']);
+                $this->UpdateFormField('Consumers', 'columns', json_encode($this->loadFormUnit($element, $unit)['columns'], JSON_THROW_ON_ERROR));
             }
         }
+    }
+
+    private function modeCaption(string $mode): string
+    {
+        return ['Auto' => 'Automatisch', 'On' => 'Aktiv', 'Off' => 'Inaktiv'][$mode] ?? 'Ungültiger Modus';
     }
 
     private function syncLoads(string $profile): void
@@ -164,7 +169,7 @@ class PeakShaving extends IPSModule
             $this->RegisterVariableString('LoadState_' . $id, $name . ': ' . $this->Translate('Status'), '', 102);
             $this->RegisterVariableString('LoadMode_' . $id, $name . ': ' . $this->Translate('Modus'), '', 103);
             $this->RegisterVariableInteger('LoadPriority_' . $id, $name . ': ' . $this->Translate('Priorität'), '', 104);
-            $this->SetValue('LoadMode_' . $id, $load['Mode'] ?? 'Auto');
+            $this->SetValue('LoadMode_' . $id, $this->modeCaption($load['Mode'] ?? 'Auto'));
             $this->SetValue('LoadPriority_' . $id, (int) ($load['Priority'] ?? 1));
         }
         $previous = json_decode($this->ReadAttributeString('LoadIDs') ?: '[]', true, 512, JSON_THROW_ON_ERROR);
@@ -184,7 +189,7 @@ class PeakShaving extends IPSModule
             $active = $load['Unit'] === 'A' && $load['ZeroToOne'] ? $command > 1 : $command > 0;
             $this->SetValue('LoadActive_' . $id, $active);
             $this->SetValue('LoadPower_' . $id, $load['actual']);
-            $this->SetValue('LoadMode_' . $id, $load['Mode']);
+            $this->SetValue('LoadMode_' . $id, $this->modeCaption($load['Mode']));
             $this->SetValue('LoadPriority_' . $id, (int) $load['Priority']);
             $state = !$load['allowed'] ? ($load['ConditionHint'] ?: 'Durch Bedingung gesperrt') : ($active ? 'Aktiv' : 'Inaktiv');
             $this->SetValue('LoadState_' . $id, $this->Translate($state));

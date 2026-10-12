@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{color-scheme:light dark;--accent:#00bfa9;--border:#cbd5d8}*{box-sizing:border-box}body{font:14px Tahoma,sans-serif;margin:0;background:transparent;color:inherit}main{padding:64px 18px 18px}header{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:18px;font-weight:500;margin:0}.badge{font-size:12px;color:var(--accent)}.summary{display:flex;gap:24px;margin:20px 0 12px;flex-wrap:wrap}.summary span{display:block;font-size:12px;opacity:.65}.summary strong{font-size:19px;font-weight:500}#state{font-size:12px;opacity:.75;margin:0 0 14px}.row{display:flex;align-items:center;gap:12px;padding:8px 0;flex-wrap:wrap}.name{flex:1;min-width:100px}.power{min-width:92px;text-align:right;font-variant-numeric:tabular-nums}.actions{display:flex}.actions button{color:var(--accent);background:transparent;border:1px solid var(--accent);font-size:18px;min-width:34px;height:30px;cursor:pointer}.actions button+button{border-left:0}.actions button.chosen{color:white;background:var(--accent)}.actions button:first-child{border-radius:4px 0 0 4px}.actions button:last-child{border-radius:0 4px 4px 0}.grip{cursor:grab;color:#888}.details{width:100%;font-size:12px;opacity:.85;margin-left:24px}.details label{margin-right:12px}.details input{width:55px}button{font:inherit}button:focus-visible{outline:2px solid currentColor;outline-offset:2px}.move{border:0;background:transparent;color:inherit;cursor:pointer}.empty{opacity:.65}#error{color:#ce3d3d;font-size:12px}
+:root{color-scheme:light dark;--accent:#00bfa9;--border:#cbd5d8}*{box-sizing:border-box}body{font:14px Tahoma,sans-serif;margin:0;background:transparent;color:inherit}main{padding:calc(64px + 1cm) 18px 18px}header{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:18px;font-weight:500;margin:0}.badge{font-size:12px;color:var(--accent)}.summary{display:flex;gap:24px;margin:20px 0 12px;flex-wrap:wrap}.summary span{display:block;font-size:12px;opacity:.65}.summary strong{font-size:19px;font-weight:500}#state{font-size:12px;opacity:.75;margin:0 0 14px}.row{display:flex;align-items:center;gap:12px;padding:4px 0;flex-wrap:wrap}.name{flex:1;min-width:100px}.power{min-width:92px;text-align:right;font-variant-numeric:tabular-nums}#distribution{font-size:12px;opacity:.65;margin:0 0 12px}.actions{display:flex;flex-shrink:0}.actions svg{width:20px;height:20px;vertical-align:middle}.actions button{padding:3px 6px}.actions button{color:var(--accent);background:transparent;border:1px solid var(--accent);font-size:18px;min-width:34px;height:30px;cursor:pointer}.actions button+button{border-left:0}.actions button.chosen{color:white;background:var(--accent)}.actions button:first-child{border-radius:4px 0 0 4px}.actions button:last-child{border-radius:0 4px 4px 0}.grip{cursor:grab;color:#888}.details{width:100%;font-size:12px;opacity:.85;margin-left:24px}.details label{margin-right:12px}.details input{width:55px}button{font:inherit}button:focus-visible{outline:2px solid currentColor;outline-offset:2px}.move{border:0;background:transparent;color:inherit;cursor:pointer}.empty{opacity:.65}#error{color:#ce3d3d;font-size:12px}
 </style>
 <main>
 <div class="badge" id="active"></div>
@@ -13,10 +13,11 @@
 <script>
 let current=__INITIAL_DATA__;
 let dragged=null;
+const icons={Automatisch:'<path d="M19 7a8 8 0 0 0-14 2M5 4v5h5M5 17a8 8 0 0 0 14-2m0 5v-5h-5"/>',Aktiv:'<path d="m5 12 4 4 10-11"/>',Inaktiv:'<path d="m6 6 12 12M6 18 18 6"/>','Verbraucher-Einstellungen':'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/><path d="M19 2v4m-2-2h4"/>'};
 const format=value=>value===null?'—':new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(Number(value)||0)+' '+current.unit;
 function act(ident,value){document.getElementById('error').textContent='';try{requestAction(ident,value)}catch(e){document.getElementById('error').textContent='Aktion fehlgeschlagen: '+e.message}}
 function reorder(from,to){const order=current.loads.map(x=>x.id);order.splice(to,0,order.splice(from,1)[0]);act('Reorder',JSON.stringify(order))}
-function button(text,title,action){const b=document.createElement('button');b.type='button';b.textContent=text;b.title=title;b.setAttribute('aria-label',title);b.onclick=action;return b}
+function button(text,title,action){const b=document.createElement('button');b.type='button';b.textContent=text;if(icons[title])b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[title]+'</svg>';b.title=title;b.setAttribute('aria-label',title);b.onclick=action;return b}
 function render(){
  document.getElementById('grid').textContent=format(current.grid);
  document.getElementById('target').textContent=format(current.target);
@@ -28,7 +29,7 @@ function render(){
  if(!current.loads.length){const p=document.createElement('p');p.className='empty';p.textContent='Noch keine Verbraucher hinterlegt';list.append(p)}
  current.loads.forEach((load,index)=>{
   const row=document.createElement('div');row.className='row';
-  const grip=document.createElement('span');grip.textContent='☰';grip.className='grip';grip.title='Reihenfolge durch Verschieben ändern';grip.draggable=current.distribution==='priority';grip.ondragstart=()=>dragged=index;
+  const grip=document.createElement('span');grip.textContent='=';grip.className='grip';grip.title='Reihenfolge durch Verschieben ändern';grip.draggable=current.distribution==='priority';grip.ondragstart=()=>dragged=index;
   row.ondragover=e=>e.preventDefault();row.ondrop=e=>{e.preventDefault();if(dragged!==null&&dragged!==index&&current.distribution==='priority')reorder(dragged,index);dragged=null};
   const name=document.createElement('span');name.className='name';name.textContent=load.name;
   const controls=document.createElement('div');controls.className='actions';

@@ -20,7 +20,7 @@ class PeakShaving extends IPSModule
         $this->RegisterPropertyString('PowerUnit', 'W');
         $this->RegisterPropertyString('Distribution', 'priority');
         $this->RegisterPropertyString('UpdateMode', 'timer');
-        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'LoadMaxAge' => 0, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0] as $name => $value) {
+        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0] as $name => $value) {
             $this->RegisterPropertyInteger($name, $value);
         }
         foreach (['Target' => 5000, 'Hysteresis' => 100, 'MaxDischarge' => 3000, 'MaxCharge' => 3000, 'MinSOC' => 20, 'MaxSOC' => 90] as $name => $value) {
@@ -227,7 +227,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         foreach (['Target', 'Hysteresis', 'MaxCharge', 'MaxDischarge', 'MinSOC', 'MaxSOC'] as $name) {
             $settings[$name] = $this->ReadPropertyFloat($name);
         }
-        foreach (['Interval', 'MaxAge', 'LoadMaxAge'] as $name) {
+        foreach (['Interval', 'MaxAge'] as $name) {
             $settings[$name] = $this->ReadPropertyInteger($name);
         }
         $variables = [];
@@ -245,7 +245,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             $entry['Istleistung'] = $this->diagnosticVariable((int) ($load['ActualPower'] ?? 0));
             $loads[] = $entry;
         }
-        return json_encode(['Modulversion' => '0.5', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
+        return json_encode(['Modulversion' => '0.5.1', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
             'Letzte Regelung UTC' => $this->ReadAttributeString('LastRun'), 'Letzter Fehler' => $this->ReadAttributeString('LastError'),
             'Regelstatus' => $this->GetValue('State'), 'Einstellungen' => $settings, 'Variablen' => $variables,
             'Verbraucher' => $loads, 'Netzvariable abonniert' => (int) $this->ReadAttributeString('SubscribedGrid'),
@@ -656,7 +656,9 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                     throw new RuntimeException(($c['Name'] ?: 'Wallbox') . ': Ampere-Modus erfordert Grenzen in A (z.B. Maximum 16, Minimum 6, Schrittweite 1), nicht Watt');
                 }
                 $c['commanded'] = (float) GetValue((int) $c['Setpoint']);
-                $c['actual'] = $c['ActualPower'] ? $this->readMeasurement((int) $c['ActualPower'], ($c['Name'] ?: 'Verbraucher') . ': Istleistung', $this->ReadPropertyInteger('LoadMaxAge')) : ($c['Unit'] === 'Switch' ? ($c['commanded'] ? $c['Max'] : 0) : ($c['Unit'] === 'A' && $c['ZeroToOne'] && $c['commanded'] <= 1 ? 0 : $c['commanded'] * PeakPlanner::factor($c)));
+                // Wallboxen melden oft nur geänderte Leistung. Ein unveränderter
+                // Nullwert ist gültig und wird nicht anhand seines Zeitstempels verworfen.
+                $c['actual'] = $c['ActualPower'] ? $this->readMeasurement((int) $c['ActualPower'], ($c['Name'] ?: 'Verbraucher') . ': Istleistung', 0) : ($c['Unit'] === 'Switch' ? ($c['commanded'] ? $c['Max'] : 0) : ($c['Unit'] === 'A' && $c['ZeroToOne'] && $c['commanded'] <= 1 ? 0 : $c['commanded'] * PeakPlanner::factor($c)));
                 // Nur ausdrücklich aktivierte Bedingungen prüfen. Ohne Haken keine Variable nötig.
                 $c['allowed'] = !$c['UseCondition'] || $this->conditionPassing($c['Condition']);
                 if ($c['actual'] < 0) {

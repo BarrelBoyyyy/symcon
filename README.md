@@ -141,3 +141,10 @@ Die globale Option **Batterie zur Pufferung der Verbraucher nutzen** ist standar
 **Maximales Alter der Verbraucher-Istleistung** ist getrennt von der Altersgrenze für Netz/Batterie/SOC. Standard 0 deaktiviert ausschließlich die Altersprüfung für optionale Verbraucher-Messwerte, deren Geräte häufig nur bei Wertänderungen senden. Dann wird der letzte numerische Wert verwendet, was eine funktionierende Geräteanbindung voraussetzt. Wer Ausfälle dieser Rückmeldung erkennen möchte, trägt eine passende positive Grenze ein. Die Altersprüfung der Netz-/Batteriemessung bleibt bestehen. Die Diagnose enthält für alle Messwerte weiterhin ihr tatsächliches Alter.
 
 Die Kachel hat zusätzlich 64 Pixel Abstand oben, damit der Inhalt unter dem vom Benutzer vergebenen Titel beginnt. Die 0.5-Tests enthalten den Fall aus dem bereitgestellten Diagnosebericht mit vier Wallboxen und Batteriepuffer.
+
+
+### Version 0.5.1: Unveränderte Wallbox-Werte
+
+Für Verbraucher-Istwerte gibt es keine Altersprüfung mehr, auch wenn in einer alten Konfiguration eine positive `LoadMaxAge` gespeichert war. Ein dauerhaft unveränderter Wert von 0 bleibt gültig. Vorhandensein, numerischer Typ und endlicher Wert werden weiterhin geprüft; die Rückmeldung muss dem tatsächlichen Geräteverbrauch entsprechen. Zeitstempel werden zur Diagnose angezeigt, sind aber kein Beleg für einen Verbindungsfehler. Die Altersprüfung für Netz, Batterie und SOC bleibt unverändert.
+
+Die Kachel wurde zusätzlich um 1 CSS-Zentimeter nach unten verschoben. Die Geräteliste verwendet kompaktere Zeilen, einen Reihenfolgegriff und dünne türkisfarbene SVG-Symbole nach dem dokumentierten Energie-Manager-Aufbau. Es bleibt eine eigene Peak-Shaving-Darstellung; Nacht-/preisabhängige Energie-Manager-Funktionen gehören nicht dazu.

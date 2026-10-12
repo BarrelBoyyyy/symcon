@@ -52,13 +52,6 @@
       "caption": "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)"
     },
     {
-      "type": "NumberSpinner",
-      "name": "LoadMaxAge",
-      "caption": "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)",
-      "minimum": 0,
-      "digits": 0
-    },
-    {
       "type": "Label",
       "caption": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
     },

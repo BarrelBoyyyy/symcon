@@ -29,10 +29,10 @@
     {
       "type": "Select",
       "name": "Distribution",
-      "caption": "Verteilung auf Verbraucher",
+      "caption": "Verteilung: Gleichmäßig oder Reihenfolge",
       "options": [
         {
-          "caption": "Nach Priorität",
+          "caption": "Nach Reihenfolge",
           "value": "priority"
         },
         {
@@ -47,10 +47,30 @@
       "caption": "Netzleistung: Bezug ist negativ"
     },
     {
+      "type": "Label",
+      "caption": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
+    },
+    {
       "type": "NumberSpinner",
       "name": "Target",
       "caption": "Zielnetzbezug ({unit})",
       "digits": 2
+    },
+    {
+      "type": "Select",
+      "name": "UpdateMode",
+      "caption": "Regelung auslösen",
+      "options": [
+        {
+          "caption": "Nach Sekunden",
+          "value": "timer"
+        },
+        {
+          "caption": "Bei Änderung der Netzvariable",
+          "value": "change"
+        }
+      ],
+      "onChange": "PS_ConfigureUpdateMode($id, $UpdateMode);"
     },
     {
       "type": "NumberSpinner",
@@ -61,7 +81,7 @@
     {
       "type": "NumberSpinner",
       "name": "Interval",
-      "caption": "Regelintervall (Sekunden)",
+      "caption": "Regelintervall (Sekunden, nur Zeitsteuerung)",
       "digits": 0
     },
     {
@@ -116,17 +136,6 @@
       "caption": "Entladesollwert negativ schreiben"
     },
     {
-      "type": "SelectVariable",
-      "name": "BatteryStatus",
-      "caption": "Batterie-Status / Bereitschaft (optional)"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "BatteryReadyValue",
-      "caption": "Statuswert für Bereitschaft (boolesch: 0/1)",
-      "digits": 0
-    },
-    {
       "type": "CheckBox",
       "name": "InvertBatteryCommand",
       "caption": "Gemeinsamer Sollwert: positiv = Laden",
@@ -135,7 +144,7 @@
     {
       "type": "SelectVariable",
       "name": "BatteryActual",
-      "caption": "Batterie-Istleistung ({unit}, optional – sonst aus Sollwerten geschätzt)"
+      "caption": "Gemessene Batterie-Leistung ({unit}, optional; eigenes Vorzeichen)"
     },
     {
       "type": "SelectVariable",
@@ -177,9 +186,19 @@
       "caption": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung"
     },
     {
-      "type": "CheckBox",
+      "type": "Select",
       "name": "InvertBattery",
-      "caption": "Batterie-Istleistung: positiv = Laden"
+      "caption": "Vorzeichen der gemessenen Batterie-Leistung (unabhängig vom Sollwert)",
+      "options": [
+        {
+          "caption": "Positiv = Entladen, negativ = Laden",
+          "value": false
+        },
+        {
+          "caption": "Positiv = Laden, negativ = Entladen",
+          "value": true
+        }
+      ]
     },
     {
       "type": "List",
@@ -245,7 +264,7 @@
         },
         {
           "name": "Priority",
-          "caption": "Priorität (1 = zuerst versorgen)",
+          "caption": "Reihenfolge (1 = zuerst versorgen)",
           "width": "180px",
           "add": 1,
           "edit": {
@@ -332,24 +351,6 @@
           }
         },
         {
-          "name": "Condition",
-          "caption": "Bedingung (optional)",
-          "width": "180px",
-          "add": "[]",
-          "edit": {
-            "type": "SelectCondition"
-          }
-        },
-        {
-          "name": "ConditionHint",
-          "caption": "Hinweis bei Blockierung",
-          "width": "180px",
-          "add": "",
-          "edit": {
-            "type": "ValidationTextBox"
-          }
-        },
-        {
           "name": "MinRuntime",
           "caption": "Mindestlaufzeit (s)",
           "width": "180px",
@@ -377,15 +378,6 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
-        },
-        {
-          "name": "StopOnCondition",
-          "caption": "Bei falscher Bedingung sofort stoppen",
-          "width": "180px",
-          "add": true,
-          "edit": {
-            "type": "CheckBox"
           }
         },
         {
@@ -419,6 +411,11 @@
       "type": "Button",
       "caption": "Jetzt regeln",
       "onClick": "PS_Control($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Diagnosebericht erstellen",
+      "onClick": "echo PS_GenerateDiagnostics($id);"
     }
   ],
   "status": [

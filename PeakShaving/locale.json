@@ -80,7 +80,22 @@
       "Verteilung auf Verbraucher": "Verteilung auf Verbraucher",
       "Nach Priorität": "Nach Priorität",
       "Gleichmäßig verteilen": "Gleichmäßig verteilen",
-      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung"
+      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung",
+      "Reihenfolge": "Reihenfolge",
+      "Verteilung: Gleichmäßig oder Reihenfolge": "Verteilung: Gleichmäßig oder Reihenfolge",
+      "Nach Reihenfolge": "Nach Reihenfolge",
+      "Regelung auslösen": "Regelung auslösen",
+      "Nach Sekunden": "Nach Sekunden",
+      "Bei Änderung der Netzvariable": "Bei Änderung der Netzvariable",
+      "Regelintervall (Sekunden, nur Zeitsteuerung)": "Regelintervall (Sekunden, nur Zeitsteuerung)",
+      "Gemessene Batterie-Leistung ({unit}, optional; eigenes Vorzeichen)": "Gemessene Batterie-Leistung ({unit}, optional; eigenes Vorzeichen)",
+      "Vorzeichen der gemessenen Batterie-Leistung (unabhängig vom Sollwert)": "Vorzeichen der gemessenen Batterie-Leistung (unabhängig vom Sollwert)",
+      "Positiv = Entladen, negativ = Laden": "Positiv = Entladen, negativ = Laden",
+      "Positiv = Laden, negativ = Entladen": "Positiv = Laden, negativ = Entladen",
+      "Diagnosebericht erstellen": "Diagnosebericht erstellen",
+      "Diagnosebericht": "Diagnosebericht",
+      "Reihenfolge (1 = zuerst versorgen)": "Reihenfolge (1 = zuerst versorgen)",
+      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
     },
     "en": {
       "Regelung aktivieren": "Regelung aktivieren",
@@ -162,7 +177,22 @@
       "Verteilung auf Verbraucher": "Verteilung auf Verbraucher",
       "Nach Priorität": "Nach Priorität",
       "Gleichmäßig verteilen": "Gleichmäßig verteilen",
-      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung"
+      "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung": "Ladezustand (%) – optional, 0 = ohne SOC-Grenzprüfung",
+      "Reihenfolge": "Reihenfolge",
+      "Verteilung: Gleichmäßig oder Reihenfolge": "Verteilung: Gleichmäßig oder Reihenfolge",
+      "Nach Reihenfolge": "Nach Reihenfolge",
+      "Regelung auslösen": "Regelung auslösen",
+      "Nach Sekunden": "Nach Sekunden",
+      "Bei Änderung der Netzvariable": "Bei Änderung der Netzvariable",
+      "Regelintervall (Sekunden, nur Zeitsteuerung)": "Regelintervall (Sekunden, nur Zeitsteuerung)",
+      "Gemessene Batterie-Leistung ({unit}, optional; eigenes Vorzeichen)": "Gemessene Batterie-Leistung ({unit}, optional; eigenes Vorzeichen)",
+      "Vorzeichen der gemessenen Batterie-Leistung (unabhängig vom Sollwert)": "Vorzeichen der gemessenen Batterie-Leistung (unabhängig vom Sollwert)",
+      "Positiv = Entladen, negativ = Laden": "Positiv = Entladen, negativ = Laden",
+      "Positiv = Laden, negativ = Entladen": "Positiv = Laden, negativ = Entladen",
+      "Diagnosebericht erstellen": "Diagnosebericht erstellen",
+      "Diagnosebericht": "Diagnosebericht",
+      "Reihenfolge (1 = zuerst versorgen)": "Reihenfolge (1 = zuerst versorgen)",
+      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
     }
   }
 }

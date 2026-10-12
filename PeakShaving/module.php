@@ -18,7 +18,8 @@ class PeakShaving extends IPSModule
         $this->RegisterPropertyString('BatteryMode', 'separate');
         $this->RegisterPropertyString('PowerUnit', 'W');
         $this->RegisterPropertyString('Distribution', 'priority');
-        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0, 'BatteryStatus' => 0, 'BatteryReadyValue' => 1] as $name => $value) {
+        $this->RegisterPropertyString('UpdateMode', 'timer');
+        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0] as $name => $value) {
             $this->RegisterPropertyInteger($name, $value);
         }
         foreach (['Target' => 5000, 'Hysteresis' => 100, 'MaxDischarge' => 3000, 'MaxCharge' => 3000, 'MinSOC' => 20, 'MaxSOC' => 90] as $name => $value) {
@@ -29,9 +30,14 @@ class PeakShaving extends IPSModule
         $this->RegisterAttributeString('OutputUnit', 'W');
         $this->RegisterAttributeString('LoadOverrides', '{}');
         $this->RegisterAttributeString('LoadConfig', '');
+        $this->RegisterAttributeString('Trace', '[]');
+        $this->RegisterAttributeString('LastError', '');
+        $this->RegisterAttributeString('LastRun', '');
+        $this->RegisterAttributeString('SubscribedGrid', '0');
         $this->RegisterVariableFloat('Grid', $this->Translate('Netzbezug'), '~Watt', 1);
         $this->RegisterVariableString('State', $this->Translate('Regelstatus'), '', 2);
         $this->RegisterVariableFloat('Projected', $this->Translate('Geplanter Netzbezug'), '~Watt', 3);
+        $this->RegisterVariableString('Diagnostics', 'Diagnosebericht', '', 5);
         $this->RegisterVariableBoolean('PeakActive', $this->Translate('Peak Shaving aktiv'), '~Switch', 4);
         $this->RegisterTimer('Control', 0, 'PS_Control($_IPS["TARGET"]);');
     }
@@ -68,15 +74,117 @@ class PeakShaving extends IPSModule
             }
             $this->WriteAttributeString('OutputUnit', $this->ReadPropertyString('PowerUnit'));
             $enabled = $this->ReadPropertyBoolean('Enabled');
-            $this->SetTimerInterval('Control', $enabled ? max(1, $this->ReadPropertyInteger('Interval')) * 1000 : 0);
+            $oldGrid = (int) $this->ReadAttributeString('SubscribedGrid');
+            if ($oldGrid) {
+                $this->UnregisterMessage($oldGrid, VM_UPDATE);
+            }
+            $this->WriteAttributeString('SubscribedGrid', '0');
+            $updateMode = $this->ReadPropertyString('UpdateMode');
+            if (!in_array($updateMode, ['timer', 'change'], true)) {
+                throw new RuntimeException('Ungültiger Aktualisierungsmodus');
+            }
+            $gridID = $this->ReadPropertyInteger('GridPower');
+            if ($enabled && $updateMode === 'change' && (!$gridID || !IPS_VariableExists($gridID))) {
+                throw new RuntimeException('Für die Regelung bei Änderung muss eine Netzvariable ausgewählt sein');
+            }
+            if ($enabled && $updateMode === 'change' && $gridID && IPS_VariableExists($gridID)) {
+                $this->RegisterMessage($gridID, VM_UPDATE);
+                $this->WriteAttributeString('SubscribedGrid', (string) $gridID);
+            }
+            $this->SetTimerInterval('Control', $enabled && $updateMode === 'timer' ? max(1, $this->ReadPropertyInteger('Interval')) * 1000 : 0);
             $this->SetStatus($enabled ? 102 : 104);
             $this->publishVisualization();
         } catch (Throwable $e) {
             $this->SetTimerInterval('Control', 0);
             $this->SetValue('PeakActive', false);
             $this->SetValue('State', $e->getMessage());
+$this->WriteAttributeString('LastError', $e->getMessage());
+            $this->trace('Fehler', ['Meldung' => $e->getMessage()]);
             $this->SetStatus(200);
         }
+    }
+
+    public function ConfigureUpdateMode(string $mode): void
+    {
+        $this->UpdateFormField('Interval', 'visible', $mode === 'timer');
+    }
+
+    public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
+    {
+        // VM_UPDATE meldet auch identische Updates. Nur ein geänderter Netz-Wert löst aus.
+        if ($Message === VM_UPDATE && $SenderID === $this->ReadPropertyInteger('GridPower')
+            && $this->ReadPropertyString('UpdateMode') === 'change'
+            && $this->ReadPropertyBoolean('Enabled') && !empty($Data[1])) {
+            $this->Control();
+        }
+    }
+
+    private function trace(string $event, array $details = []): void
+    {
+        $trace = json_decode($this->ReadAttributeString('Trace'), true) ?: [];
+        $trace[] = ['Zeit UTC' => gmdate('c'), 'Ereignis' => $event, 'Details' => $details];
+        $this->WriteAttributeString('Trace', json_encode(array_slice($trace, -40), JSON_THROW_ON_ERROR));
+    }
+
+    public function GetDiagnostics(): string
+    {
+        $settings = [];
+        foreach (['Enabled', 'InvertGrid', 'InvertBattery', 'InvertBatteryCommand', 'InvertCharge', 'InvertDischarge', 'PeakOverridesHold'] as $name) {
+            $settings[$name] = $this->ReadPropertyBoolean($name);
+        }
+        foreach (['PowerUnit', 'BatteryMode', 'Distribution', 'UpdateMode'] as $name) {
+            $settings[$name] = $this->ReadPropertyString($name);
+        }
+        foreach (['Target', 'Hysteresis', 'MaxCharge', 'MaxDischarge', 'MinSOC', 'MaxSOC'] as $name) {
+            $settings[$name] = $this->ReadPropertyFloat($name);
+        }
+        foreach (['Interval', 'MaxAge'] as $name) {
+            $settings[$name] = $this->ReadPropertyInteger($name);
+        }
+        $variables = [];
+        foreach (['GridPower', 'BatteryActual', 'BatterySetpoint', 'BatteryCharge', 'BatteryDischarge', 'SOC'] as $name) {
+            $variables[$name] = $this->diagnosticVariable($this->ReadPropertyInteger($name));
+        }
+        $loads = [];
+        $overrides = json_decode($this->ReadAttributeString('LoadOverrides'), true) ?: [];
+        $configuredLoads = json_decode($this->ReadPropertyString('Consumers'), true);
+        foreach (is_array($configuredLoads) ? $configuredLoads : [] as $load) {
+            // Nur bekannte Steuerparameter aufnehmen; keine fremden Stringwerte/Umgebungsdaten.
+            $entry = array_intersect_key($load, array_flip(['Name', 'Unit', 'Priority', 'Mode', 'Min', 'Max', 'Step', 'MaxPower', 'Voltage', 'Phases', 'PerPhaseW', 'ZeroToOne', 'MinRuntime', 'FollowUp', 'Delay']));
+            $entry['Laufzeitänderungen'] = $overrides[(string) ($load['Setpoint'] ?? 0)] ?? [];
+            $entry['Aktionsvariable'] = $this->diagnosticVariable((int) ($load['Setpoint'] ?? 0));
+            $entry['Istleistung'] = $this->diagnosticVariable((int) ($load['ActualPower'] ?? 0));
+            $loads[] = $entry;
+        }
+        return json_encode(['Modulversion' => '0.4', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
+            'Letzte Regelung UTC' => $this->ReadAttributeString('LastRun'), 'Letzter Fehler' => $this->ReadAttributeString('LastError'),
+            'Regelstatus' => $this->GetValue('State'), 'Einstellungen' => $settings, 'Variablen' => $variables,
+            'Verbraucher' => $loads, 'Netzvariable abonniert' => (int) $this->ReadAttributeString('SubscribedGrid'),
+            'Letzte Ereignisse' => json_decode($this->ReadAttributeString('Trace'), true)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    private function diagnosticVariable(int $id): array
+    {
+        if (!$id || !IPS_VariableExists($id)) {
+            return ['ID' => $id, 'Zustand' => $id ? 'Nicht vorhanden' : 'Nicht ausgewählt'];
+        }
+        $meta = IPS_GetVariable($id);
+        $numeric = in_array($meta['VariableType'], [0, 1, 2], true);
+        $value = $numeric ? GetValue($id) : 'Kein numerischer Wert';
+        if (is_float($value) && !is_finite($value)) {
+            $value = 'Ungültiger numerischer Wert (NaN/Unendlich)';
+        }
+        return ['ID' => $id, 'Typ' => $meta['VariableType'], 'Wert' => $value,
+            'Alter Sekunden' => max(0, time() - $meta['VariableUpdated']),
+            'Aktion vorhanden' => (bool) ($meta['VariableCustomAction'] ?: $meta['VariableAction'])];
+    }
+
+    public function GenerateDiagnostics(): string
+    {
+        // Diagnose liest nur; sie schaltet keine Geräte und startet keinen Regelzyklus.
+        $report = $this->GetDiagnostics();
+        $this->SetValue('Diagnostics', $report);
+        return $report;
     }
 
     private function powerFactor(): float
@@ -118,6 +226,9 @@ class PeakShaving extends IPSModule
             }
             if (isset($element['caption'])) {
                 $element['caption'] = str_replace('{unit}', $unit, $this->Translate($element['caption']));
+            }
+            if ($name === 'Interval') {
+                $element['visible'] = $this->ReadPropertyString('UpdateMode') === 'timer';
             }
             if ($name === 'Consumers') {
                 $element = $this->loadFormUnit($element, $unit);
@@ -187,7 +298,7 @@ class PeakShaving extends IPSModule
             $this->RegisterVariableString('LoadState_' . $id, $name . ': ' . $this->Translate('Status'), '', 102);
             $this->RegisterVariableString('LoadMode_' . $id, $name . ': ' . $this->Translate('Modus'), '', 103);
             $this->EnableAction('LoadMode_' . $id);
-            $this->RegisterVariableInteger('LoadPriority_' . $id, $name . ': ' . $this->Translate('Priorität'), '', 104);
+            $this->RegisterVariableInteger('LoadPriority_' . $id, $name . ': ' . $this->Translate('Reihenfolge'), '', 104);
             $this->EnableAction('LoadPriority_' . $id);
             $this->SetValue('LoadMode_' . $id, $this->modeCaption($load['Mode'] ?? 'Auto'));
             $this->SetValue('LoadPriority_' . $id, (int) ($load['Priority'] ?? 1));
@@ -217,32 +328,6 @@ class PeakShaving extends IPSModule
             $state = !$load['allowed'] ? ($load['ConditionHint'] ?: 'Durch Bedingung gesperrt') : ($active ? 'Aktiv' : 'Inaktiv');
             $this->SetValue('LoadState_' . $id, $this->Translate($state));
         }
-    }
-
-    private function conditionPassing(string $condition): bool
-    {
-        if (trim($condition) === '') {
-            return true;
-        }
-        $nodes = json_decode($condition, true, 512, JSON_THROW_ON_ERROR);
-        if (!$nodes) {
-            return true;
-        }
-        // SelectCondition kann einen leeren Wurzelknoten statt [] speichern.
-        $roots = isset($nodes['rules']) ? [$nodes] : $nodes;
-        $onlyEmptyNodes = true;
-        foreach ($roots as $node) {
-            if (!is_array($node) || !isset($node['rules'])) {
-                $onlyEmptyNodes = false;
-                break;
-            }
-            foreach ($node['rules'] as $rules) {
-                if (!empty($rules)) {
-                    $onlyEmptyNodes = false;
-                }
-            }
-        }
-        return $onlyEmptyNodes || IPS_IsConditionPassing($condition);
     }
 
     public function GetVisualizationTile()
@@ -280,7 +365,7 @@ class PeakShaving extends IPSModule
                 $power = ($dischargeID && IPS_VariableExists($dischargeID) ? ($this->ReadPropertyBoolean('InvertDischarge') ? -1 : 1) * (float) GetValue($dischargeID) : 0)
                     - ($batteryID && IPS_VariableExists($batteryID) ? ($this->ReadPropertyBoolean('InvertCharge') ? -1 : 1) * (float) GetValue($batteryID) : 0);
             }
-            $battery = ['power' => abs($power), 'state' => $power > 0 ? 'Entladen' : ($power < 0 ? 'Laden' : 'Passiv')];
+            $battery = ['power' => is_finite($power) ? abs($power) : null, 'state' => !is_finite($power) ? 'Ungültiger Messwert' : ($power > 0 ? 'Entladen' : ($power < 0 ? 'Laden' : 'Passiv'))];
         }
         return ['battery' => $battery, 'grid' => $this->GetValue('Grid'), 'target' => $this->ReadPropertyFloat('Target'),
             'active' => $this->GetValue('PeakActive'), 'state' => $this->GetValue('State'),
@@ -373,6 +458,7 @@ class PeakShaving extends IPSModule
         }
         $typed = $v['VariableType'] === 0 ? (bool) $value : ($v['VariableType'] === 1 ? (int) round($value) : $value);
         if (abs((float) GetValue($id) - $typed) > 0.000000001) {
+            $this->trace('Sollwert schreiben', ['Variable' => $id, 'Sollwert' => $typed]);
             if (!RequestAction($id, $typed)) {
                 throw new RuntimeException('Aktion fehlgeschlagen: ' . $id);
             }
@@ -389,6 +475,8 @@ class PeakShaving extends IPSModule
             return;
         }
         try {
+            $this->WriteAttributeString('LastRun', gmdate('c'));
+            $this->trace('Regelung gestartet');
             $this->powerFactor();
             if ($this->ReadPropertyFloat('Hysteresis') < 0 || $this->ReadPropertyInteger('MaxAge') < 1 || $this->ReadPropertyFloat('MaxCharge') < 0 || $this->ReadPropertyFloat('MaxDischarge') < 0) {
                 throw new RuntimeException('Grenzen, Messwertalter oder Hysterese ungültig');
@@ -416,16 +504,6 @@ class PeakShaving extends IPSModule
                         throw new RuntimeException('Lade- und Entladevariable müssen verschieden sein');
                     }
                     $ids[] = $dischargeID;
-                }
-                $statusID = $this->ReadPropertyInteger('BatteryStatus');
-                if ($statusID) {
-                    if (!IPS_VariableExists($statusID)) {
-                        throw new RuntimeException('Batterie-Statusvariable fehlt');
-                    }
-                    $meta = IPS_GetVariable($statusID);
-                    if (time() - $meta['VariableUpdated'] > $this->ReadPropertyInteger('MaxAge') || !in_array($meta['VariableType'], [0, 1, 2], true) || (float) GetValue($statusID) !== (float) $this->ReadPropertyInteger('BatteryReadyValue')) {
-                        throw new RuntimeException('Batterie nicht bereit oder Status veraltet');
-                    }
                 }
                 $commandSign = $this->ReadPropertyBoolean('InvertBatteryCommand') ? -1 : 1;
                 $chargeSign = $this->ReadPropertyBoolean('InvertCharge') ? -1 : 1;
@@ -460,8 +538,8 @@ class PeakShaving extends IPSModule
                 $c = array_replace($c, $overrides[(string) $c['Setpoint']] ?? []);
                 $c['commanded'] = (float) GetValue((int) $c['Setpoint']);
                 $c['actual'] = $c['ActualPower'] ? $this->readMeasurement((int) $c['ActualPower']) : ($c['Unit'] === 'Switch' ? ($c['commanded'] ? $c['Max'] : 0) : ($c['Unit'] === 'A' && $c['ZeroToOne'] && $c['commanded'] <= 1 ? 0 : $c['commanded'] * PeakPlanner::factor($c)));
-                $condition = is_string($c['Condition']) ? $c['Condition'] : json_encode($c['Condition'], JSON_THROW_ON_ERROR);
-                $c['allowed'] = $this->conditionPassing($condition);
+                // Keine Bedingungsvariable erforderlich; alte Bedingungsfelder werden ignoriert.
+                $c['allowed'] = true;
                 if ($c['actual'] < 0) {
                     throw new RuntimeException('Verbraucherleistung muss positiv sein');
                 }
@@ -557,11 +635,15 @@ class PeakShaving extends IPSModule
                 $notes[] = 'Zielnetzbezug mit aktuellen Freigaben / Grenzen nicht erreichbar';
             }
             $this->SetValue('State', $notes ? implode('; ', array_unique($notes)) : (abs($grid - $this->ReadPropertyFloat('Target')) <= $this->ReadPropertyFloat('Hysteresis') ? 'Innerhalb Hysterese' : 'Sollwerte angepasst'));
+            $this->WriteAttributeString('LastError', '');
+            $this->trace('Regelung abgeschlossen', ['Netzbezug' => $grid, 'Geplanter Netzbezug' => $projected, 'Einheit' => $this->ReadPropertyString('PowerUnit')]);
             $this->SetStatus(102);
             $this->publishVisualization();
         } catch (Throwable $e) {
             $this->SetValue('PeakActive', false);
             $this->SetValue('State', $e->getMessage());
+$this->WriteAttributeString('LastError', $e->getMessage());
+            $this->trace('Fehler', ['Meldung' => $e->getMessage()]);
             $this->SetStatus(200);
             $this->SendDebug('Regelung gestoppt', $e->getMessage(), 0);
             $this->publishVisualization();

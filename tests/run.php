@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 set_error_handler(static function ($severity, $message, $file, $line) { throw new ErrorException($message, 0, $severity, $file, $line); });
+define('VM_UPDATE', 10603);
 require_once __DIR__ . '/../PeakShaving/Controller.php';
 $count = 0;
 function expect($actual, $expected, string $name): void
@@ -67,6 +68,9 @@ class IPSModule
     public function RegisterVariableFloat($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterVariableString($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
     public function RegisterVariableBoolean($n, $caption, $profile, $position) { $this->registered[$n] = $profile; }
+    public array $messages = [];
+    public function RegisterMessage($id, $message) { $this->messages[$id] = $message; }
+    public function UnregisterMessage($id, $message) { unset($this->messages[$id]); }
     public function EnableAction($ident) {}
     public function SetVisualizationType($type) {}
     public function UpdateVisualizationValue($value) { $this->visualization = $value; }
@@ -174,7 +178,7 @@ $m->properties['BatteryStatus'] = 9;
 variable(9, false, 0, 0, 0);
 $GLOBALS['writes'] = [];
 $m->Control();
-expect($m->status, 200, 'battery unavailable');
+expect($m->status, 102, 'legacy battery readiness no longer required');
 expect($GLOBALS['writes'], [], 'unavailable prevents actions');
 $m->properties['BatteryReadyValue'] = 0;
 $m->Control();
@@ -211,8 +215,8 @@ $n->properties['Consumers'] = json_encode([$c]);
 $GLOBALS['writes'] = [];
 variable(1, 5000);
 $n->Control();
-expect($GLOBALS['writes'][20], false, 'condition stops even in grid deadband');
-expect(str_contains($n->values['State'], 'Bedingung'), true, 'condition status');
+expect($GLOBALS['writes'], [], 'legacy condition ignored inside deadband');
+expect(str_contains($n->values['State'], 'Bedingung'), false, 'no required condition remains');
 $c['Condition'] = '[]';
 $c['MinRuntime'] = 0;
 $c['FollowUp'] = 60;
@@ -411,4 +415,62 @@ expect($elements['MaxCharge']['digits'], 0, 'charging limit without decimals');
 expect($elements['Target']['digits'], 2, 'target has two decimals');
 expect($elements['MaxSOC']['maximum'], 100, 'SOC upper UI bound');
 expect($elements['MinSOC']['minimum'], 0, 'SOC lower UI bound');
+// Netzänderungsmodus meldet sich an genau einer Quelle an und deaktiviert den Timer.
+$events = new PeakShaving();
+$events->Create();
+$events->properties['Enabled'] = true;
+$events->properties['GridPower'] = 80;
+$events->properties['UpdateMode'] = 'change';
+variable(80, 6000);
+$events->ApplyChanges();
+expect($events->timer, 0, 'event mode disables timer');
+expect($events->messages, [80 => VM_UPDATE], 'grid event subscribed');
+$events->MessageSink(time(), 80, VM_UPDATE, [6000, false]);
+expect($events->attributes['LastRun'], '', 'unchanged measurement does not run');
+$events->MessageSink(time(), 80, VM_UPDATE, [6000, true]);
+expect($events->values['Grid'], 6000, 'changed measurement runs control');
+variable(81, 7000);
+$events->properties['GridPower'] = 81;
+$events->ApplyChanges();
+expect($events->messages, [81 => VM_UPDATE], 'old event subscription removed');
+$events->properties['UpdateMode'] = 'timer';
+$events->ApplyChanges();
+expect($events->messages, [], 'timer mode removes grid subscription');
+expect($events->timer, 5000, 'timer mode restores seconds');
+$events->ConfigureUpdateMode('change');
+expect($events->formUpdates['Interval']['visible'], false, 'seconds field hidden for events');
+$events->properties['GridPower'] = 0;
+$events->Control();
+$before = $GLOBALS['writes'];
+$report = json_decode($events->GenerateDiagnostics(), true, 512, JSON_THROW_ON_ERROR);
+expect(str_contains($report['Letzter Fehler'], 'Netzleistung'), true, 'diagnostics identify missing grid measurement');
+expect($report['Variablen']['GridPower']['Zustand'], 'Nicht ausgewählt', 'diagnostics detect optional selection state');
+expect(json_decode($events->values['Diagnostics'], true)['Letzter Fehler'], $report['Letzter Fehler'], 'diagnostic variable holds report');
+expect($GLOBALS['writes'], $before, 'diagnostics do not send device commands');
+$eventForm = json_decode($events->GetConfigurationForm(), true);
+$eventElements = array_column($eventForm['elements'], null, 'name');
+expect(isset($eventElements['BatteryReadyValue']), false, 'readiness value selector removed');
+$columns = array_column($eventElements['Consumers']['columns'], null, 'name');
+expect(isset($columns['Condition']), false, 'condition chooser removed entirely');
+expect(str_contains($events->GetVisualizationTile(), '<h1>'), false, 'visualization has no duplicate title');
+expect(str_contains($events->GetVisualizationTile(), 'Tahoma'), true, 'visualization uses Tahoma');
+$signs = new PeakShaving();
+$signs->Create();
+$signs->properties = array_replace($signs->properties, ['Enabled' => true, 'GridPower' => 90, 'BatteryMode' => 'signed', 'BatterySetpoint' => 91, 'BatteryActual' => 92, 'InvertBattery' => true]);
+variable(90, 5500);variable(91, 0, 10);variable(92, -1000);
+$signs->ApplyChanges();
+$signs->Control();
+expect($GLOBALS['writes'][91], 1500, 'battery measurement sign independent from writing sign');
+$signs->properties['InvertBatteryCommand'] = true;
+variable(91, 0, 10);
+$signs->Control();
+expect($GLOBALS['writes'][91], -1500, 'combined writing sign independently inverted');
+variable(92, NAN);
+$signs->Control();
+$invalid = json_decode($signs->GenerateDiagnostics(), true, 512, JSON_THROW_ON_ERROR);
+expect(str_contains($invalid['Variablen']['BatteryActual']['Wert'], 'Ungültiger'), true, 'diagnostic survives invalid numeric measurement');
+$signs->properties['Enabled'] = false;
+$signs->properties['UpdateMode'] = 'change';
+$signs->ApplyChanges();
+expect($signs->messages, [], 'disabled event mode unsubscribes');
 echo "$count Prüfungen bestanden\n";

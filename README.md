@@ -30,7 +30,7 @@ Die **Istleistung** ist optional und hat eine unabhängig invertierbare Vorzeich
 
 **SOC** ist eine optionale Messvariable von 0 bis 100 Prozent. Maximale Lade-/Entladeleistung und minimaler/maximaler SOC begrenzen die Befehle. Am minimalen SOC wird nicht entladen, am maximalen nicht geladen. SOC-Schutz gilt auch innerhalb der Netz-Hysterese. Ohne SOC-Variable wird keine ID 0 gelesen und es erfolgt keine SOC-Prüfung; der Speicher muss seine Ladezustandsgrenzen selbst absichern.
 
-Eine optionale **Bereitschaftsvariable** ist lesbar und boolesch oder numerisch, mit frei gewähltem Bereitschaftswert. Bei abweichendem oder veraltetem Status pausiert die gesamte Regelung ohne neue Befehle. Diese Variable dient ausschließlich der Bereitschaft, nicht der Richtungsumschaltung.
+Eine Bereitschaftsvariable oder ein Bereitschaftswert ist nicht erforderlich. Alte Bereitschaftseinstellungen werden ignoriert.
 
 Eine zusätzliche Umschaltvariable wird nicht mehr verwendet. Bei einem gemeinsamen Sollwert bestimmt ausschließlich das konfigurierbare Vorzeichen die Lade-/Entladerichtung; 0 ist passiv. Die getrennten Sollwertselektoren sind dann verborgen. Beim Wechsel zu getrennten Variablen werden nur diese beiden Selektoren angezeigt. Zuerst wird die Gegenrichtung auf 0 gesetzt; bei einem fehlgeschlagenen Stopp wird die neue Richtung nicht gestartet. Alte Umschalt-Einstellungen werden ignoriert.
 
@@ -38,7 +38,7 @@ Die Sollwertaktionen müssen die Batterie tatsächlich steuern. Zusätzliche ger
 
 ## Verbraucher und Wallboxen
 
-Die Liste folgt den grundlegenden Möglichkeiten des Energie Managers: schaltbare und skalierbare Verbraucher, optionaler gemessener Verbrauch, Bedingungen und Laufzeitbindungen. Mehrere Verbraucher mit freien Aktionsvariablen lassen sich hinterlegen.
+Die Liste folgt den grundlegenden Möglichkeiten des Energie Managers: schaltbare und skalierbare Verbraucher, optionaler gemessener Verbrauch und Laufzeitbindungen. Mehrere Verbraucher mit freien Aktionsvariablen lassen sich hinterlegen.
 
 | Einstellung | Bedeutung |
 | --- | --- |
@@ -52,14 +52,12 @@ Die Liste folgt den grundlegenden Möglichkeiten des Energie Managers: schaltbar
 | Spannung / Phasen | Umrechnung von Ampere nach Watt; feste Phasenzahl |
 | Watt pro Phase | Watt-Sollwerte pro Phase statt Gesamtleistung |
 | 0 A als 1 A schreiben | Ampere-Modus: ersetzt einen Stopp-Sollwert 0 durch 1 A |
-| Bedingung / Hinweis | Symcon-Bedingung zur Freigabe und Text bei Blockierung |
 | Mindestlaufzeit | Nach Aktivierung nicht vollständig abschalten; skalierbare Geräte können bis zur Mindestleistung reduziert werden |
 | Nachlaufzeit | Bei fehlendem Budget erst nach dieser Dauer vollständig stoppen |
 | Verzögerung | Pause zwischen Sollwertänderungen |
-| Sofort stoppen bei falscher Bedingung | Bedingung hat Vorrang vor Laufzeitbindung; andernfalls wird deren Ende abgewartet |
 | Modus | Automatisch, Aktiv (Maximum) oder Inaktiv (Stopp) |
 
-Im Modus **Aktiv** ist das Gerät von der automatischen Lastreduzierung ausgeschlossen und kann den Zielnetzbezug verhindern. Im Modus **Inaktiv** wird es gestoppt. Die Modusauswahl erfolgt in dieser Version über die Konfigurationsliste, nicht über eigene Visualisierungsvariablen pro Gerät.
+Im Modus **Aktiv** ist das Gerät von der automatischen Lastreduzierung ausgeschlossen und kann den Zielnetzbezug verhindern. Im Modus **Inaktiv** wird es gestoppt. Die Modusauswahl erfolgt über die Konfigurationsliste, Variablenaktionen oder die Kachel.
 
 Bei Ein/Aus wird erst eingeschaltet, wenn die ganze konfigurierte Einschaltleistung in das Budget passt. Skalierte Sollwerte verwenden einen expliziten Bereich von 0 bis Maximum; das Modul liest dafür keine Variablenprofile aus.
 
@@ -72,7 +70,7 @@ Die Mennekes-Option ist eine Protokollanpassung: **1 A darf nur als Stopp gelten
 1. Messwerte, Aktionsvariablen und Konfiguration prüfen.
 2. Batterie zuerst anpassen: neue Entladeleistung = Ist-Entladeleistung + Netzbezug − Ziel, begrenzt durch Leistung und SOC.
 3. Verbleibende Überschreitung durch Verbraucher mit niedriger Priorität reduzieren. Bei freier Leistung Verbraucher mit hoher Priorität anheben.
-4. Schrittweiten, Mindestleistung, Bedingungen, Betriebsmodus und Laufzeitbindungen berücksichtigen.
+4. Schrittweiten, Mindestleistung, Betriebsmodus und Laufzeitbindungen berücksichtigen.
 5. Aktionen ausführen, anschließend im nächsten Zyklus die Rückmeldung berücksichtigen.
 
 Bei Unterschreitung lädt die Batterie zuerst; Verbraucher werden angehoben, wenn ihre maximale Ladeleistung ausgeschöpft oder Laden durch SOC ausgeschlossen ist. Anders als der Energie Manager kann Peak Shaving mehrere Sollwerte in einem Zyklus verändern. Erzwungene Modus- oder Bedingungsänderungen wirken auf die Netzrückmeldung im folgenden Zyklus.
@@ -115,3 +113,18 @@ Leere Bedingungen (auch `{}` und leere SelectCondition-Wurzelknoten) gelten als 
 In der Kachelvisualisierung die Instanz hinzufügen und ihre **individuelle Darstellung** verwenden. Die eigene HTML-Kachel orientiert sich an der dokumentierten Energie-Manager-Geräteliste: Reihenfolge verschieben, Automatisch/Aktiv/Inaktiv, Einstellungen und Live-Leistung. Prioritäten lassen sich auch über Pfeile ändern. Die Batterie zeigt Lade-/Entladerichtung und Leistung; sie wird weiterhin automatisch geregelt. Der Einstellungsdialog dient Modus/Priorität; zeit-/preisabhängige Energie-Manager-Funktionen werden nicht nachgebildet. Bei gleichmäßiger Verteilung wirkt die Reihenfolge nicht auf die Leistungszuteilung. Die Kachel ist eine eigene Implementierung, kein unverändert übernommenes Symcon-Kernlayout.
 
 Die HTML-Darstellung wurde mit Chromium hinsichtlich Geräteliste, Modusaktionen, Liveupdates und Prioritätenreihenfolge geprüft. Die Kommunikation mit einer echten Symcon-Kachel muss weiterhin in der Testumgebung überprüft werden.
+
+
+### Version 0.4: Ereignisregelung und Diagnose
+
+Die Kachel enthält keine eigene Überschrift und keine „Bereit“-Anzeige mehr. Ihre Schriftart ist Tahoma; den Kacheltitel verwaltet die Symcon-Visualisierung.
+
+**Vorzeichen der gemessenen Batterie-Leistung** ist eine eigene Auswahl mit „Positiv = Entladen“ oder „Positiv = Laden“. Sie betrifft ausschließlich die zugeordnete Istleistungsvariable. Die Vorzeichen der geschriebenen Sollwerte werden unabhängig eingestellt.
+
+Die Bedingungsauswahl samt Variablenregeln ist vollständig entfernt. Alte Bedingungen werden ignoriert; zum Anlegen eines Verbrauchers wird keine Bedingungsvariable benötigt. Der Aktionssollwert bleibt für ein steuerbares Gerät erforderlich. Die gemessene Verbraucherleistung ist optional und wird ohne Zuordnung geschätzt. Auch Bereitschaftsvariable und Bereitschaftswert wurden entfernt.
+
+**Verteilung: Gleichmäßig oder Reihenfolge** bestimmt die Leistungszuteilung. Bei Reihenfolge erhalten kleinere Nummern zuerst Leistung; größere werden zuerst reduziert. Bei gleichmäßiger Verteilung spielt diese Reihenfolge keine Rolle. Technische Geräte- und Laufzeitgrenzen bleiben wirksam.
+
+**Regelung auslösen** bietet Sekundenintervall oder Änderung der Netzvariable. Im Änderungsmodus ist der Timer aus und nur eine tatsächliche Wertänderung löst einen Zyklus aus. Ein identischer, erneut übermittelter Messwert löst nicht aus. In diesem Modus wird auch ein Messwertalterfehler erst beim nächsten Zyklus festgestellt; es gibt keinen zusätzlichen Überwachungstimer.
+
+Unter den Aktionen des Instanzformulars **Diagnosebericht erstellen** wählen. Der Bericht erscheint als Text und in der Stringvariable **Diagnosebericht**; vollständig kopieren und bei Problemen weitergeben. Er enthält Version, Einstellungen, verwendete Variablen mit Typ/Wert/Alter, letzte Fehler und die letzten 40 Diagnoseereignisse einschließlich Schreibversuchen. Er liest ausschließlich relevante Moduldaten, keine Prozessumgebung oder Zugangsdaten. Die Diagnose löst keine Geräteaktionen aus.

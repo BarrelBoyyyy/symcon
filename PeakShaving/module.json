@@ -1,0 +1,13 @@
+{
+  "id": "{B9D77D4B-3F54-4F96-902A-D801F655691C}",
+  "name": "PeakShaving",
+  "type": 3,
+  "vendor": "",
+  "aliases": [
+    "Peak Shaving"
+  ],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "PS"
+}

@@ -1,0 +1,404 @@
+{
+  "elements": [
+    {
+      "type": "CheckBox",
+      "name": "Enabled",
+      "caption": "Regelung aktivieren"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "GridPower",
+      "caption": "Netzleistung (W, positiv = Bezug)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "InvertGrid",
+      "caption": "Netzleistung: Bezug ist negativ"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Target",
+      "caption": "Zielnetzbezug (W)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Hysteresis",
+      "caption": "Hysterese ± W"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Interval",
+      "caption": "Regelintervall (Sekunden)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "PeakOverridesHold",
+      "caption": "Bei Zielüberschreitung Laufzeiten und Verzögerungen übersteuern"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MaxAge",
+      "caption": "Maximales Messwertalter (Sekunden)"
+    },
+    {
+      "type": "Label",
+      "caption": "Batterie optional: freie Lade-/Entladevariablen und SOC. Ohne Istleistung wird aus Sollwerten geschätzt."
+    },
+    {
+      "type": "Select",
+      "name": "BatteryMode",
+      "caption": "Batterie-Sollwerte",
+      "options": [
+        {
+          "caption": "Getrennte Lade-/Entladevariablen",
+          "value": "separate"
+        },
+        {
+          "caption": "Gemeinsamer Leistungssollwert",
+          "value": "signed"
+        }
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatteryCharge",
+      "caption": "Laden: Leistungssollwert (W)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatteryDischarge",
+      "caption": "Entladen: Leistungssollwert (W)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "InvertCharge",
+      "caption": "Ladesollwert negativ schreiben"
+    },
+    {
+      "type": "CheckBox",
+      "name": "InvertDischarge",
+      "caption": "Entladesollwert negativ schreiben"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatteryStatus",
+      "caption": "Batterie-Status / Bereitschaft (optional)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BatteryReadyValue",
+      "caption": "Statuswert für Bereitschaft (boolesch: 0/1)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "InvertBatteryCommand",
+      "caption": "Gemeinsamer Sollwert: positiv = Laden"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatteryActual",
+      "caption": "Batterie-Istleistung (W, optional – sonst aus Sollwerten geschätzt)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatterySetpoint",
+      "caption": "Batterie-Leistungssollwert (W)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MaxDischarge",
+      "caption": "Maximale Entladeleistung (W)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MaxCharge",
+      "caption": "Maximale Ladeleistung (W)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MinSOC",
+      "caption": "Minimaler Ladezustand (%)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "MaxSOC",
+      "caption": "Maximaler Ladezustand (%)"
+    },
+    {
+      "type": "SelectVariable",
+      "name": "SOC",
+      "caption": "Ladezustand (%) – erforderlich bei Batterie"
+    },
+    {
+      "type": "CheckBox",
+      "name": "InvertBattery",
+      "caption": "Batterie-Istleistung: positiv = Laden"
+    },
+    {
+      "type": "List",
+      "name": "Consumers",
+      "caption": "Verbraucher / Wallboxen",
+      "rowCount": 5,
+      "add": true,
+      "delete": true,
+      "columns": [
+        {
+          "name": "Name",
+          "caption": "Name",
+          "width": "180px",
+          "add": "",
+          "edit": {
+            "type": "ValidationTextBox"
+          }
+        },
+        {
+          "name": "Setpoint",
+          "caption": "Aktionsvariable",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "SelectVariable"
+          }
+        },
+        {
+          "name": "ActualPower",
+          "caption": "Aktueller Verbrauch W (optional)",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "SelectVariable"
+          }
+        },
+        {
+          "name": "Unit",
+          "caption": "Einheit",
+          "width": "180px",
+          "add": "W",
+          "edit": {
+            "type": "Select",
+            "options": [
+              {
+                "caption": "Watt",
+                "value": "W"
+              },
+              {
+                "caption": "Ampere",
+                "value": "A"
+              },
+              {
+                "caption": "Ein/Aus",
+                "value": "Switch"
+              },
+              {
+                "caption": "Skalierter Sollwert (z. B. %)",
+                "value": "Scale"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Priority",
+          "caption": "Priorität (1 = zuerst versorgen)",
+          "width": "180px",
+          "add": 1,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Max",
+          "caption": "Maximum (Ein/Aus: Einschaltleistung W)",
+          "width": "180px",
+          "add": 11000,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Min",
+          "caption": "Minimaler aktiver Sollwert",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Step",
+          "caption": "Schrittweite",
+          "width": "180px",
+          "add": 100,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Voltage",
+          "caption": "Spannung (V)",
+          "width": "180px",
+          "add": 230,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Phases",
+          "caption": "Phasen",
+          "width": "180px",
+          "add": 3,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "ZeroToOne",
+          "caption": "0 A als 1 A schreiben (Mennekes)",
+          "width": "180px",
+          "add": false,
+          "edit": {
+            "type": "CheckBox"
+          }
+        },
+        {
+          "name": "MaxPower",
+          "caption": "Maximaler Verbrauch W (skalierter Sollwert)",
+          "width": "180px",
+          "add": 5000,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "PerPhaseW",
+          "caption": "Watt-Sollwert pro Phase",
+          "width": "180px",
+          "add": false,
+          "edit": {
+            "type": "CheckBox"
+          }
+        },
+        {
+          "name": "Condition",
+          "caption": "Bedingung (optional)",
+          "width": "180px",
+          "add": "[]",
+          "edit": {
+            "type": "SelectCondition"
+          }
+        },
+        {
+          "name": "ConditionHint",
+          "caption": "Hinweis bei Blockierung",
+          "width": "180px",
+          "add": "",
+          "edit": {
+            "type": "ValidationTextBox"
+          }
+        },
+        {
+          "name": "MinRuntime",
+          "caption": "Mindestlaufzeit (s)",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "FollowUp",
+          "caption": "Nachlaufzeit (s)",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "Delay",
+          "caption": "Verzögerung nach Anpassung (s)",
+          "width": "180px",
+          "add": 0,
+          "edit": {
+            "type": "NumberSpinner"
+          }
+        },
+        {
+          "name": "StopOnCondition",
+          "caption": "Bei falscher Bedingung sofort stoppen",
+          "width": "180px",
+          "add": true,
+          "edit": {
+            "type": "CheckBox"
+          }
+        },
+        {
+          "name": "Mode",
+          "caption": "Modus",
+          "width": "180px",
+          "add": "Auto",
+          "edit": {
+            "type": "Select",
+            "options": [
+              {
+                "caption": "Automatisch",
+                "value": "Auto"
+              },
+              {
+                "caption": "Aktiv",
+                "value": "On"
+              },
+              {
+                "caption": "Inaktiv",
+                "value": "Off"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "SelectVariable",
+      "name": "BatteryModeVariable",
+      "caption": "Batterie: Variable zum Umschalten Laden/Entladen (optional)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BatteryChargingValue",
+      "caption": "Umschaltwert Laden"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BatteryDischargingValue",
+      "caption": "Umschaltwert Entladen"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BatteryIdleValue",
+      "caption": "Umschaltwert Passiv"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "Jetzt regeln",
+      "onClick": "PS_Control($id);"
+    }
+  ],
+  "status": [
+    {
+      "code": 102,
+      "icon": "active",
+      "caption": "Bereit"
+    },
+    {
+      "code": 104,
+      "icon": "inactive",
+      "caption": "Deaktiviert"
+    },
+    {
+      "code": 200,
+      "icon": "error",
+      "caption": "Konfiguration / Messwerte prüfen"
+    }
+  ]
+}

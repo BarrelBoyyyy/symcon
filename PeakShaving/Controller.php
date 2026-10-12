@@ -21,16 +21,30 @@ final class PeakPlanner
      * globale Leistungseinheit. factor() übersetzt A bzw. skalierte Sollwerte dorthin.
      * Der Netz-Istwert enthält die laufenden Lasten bereits: wir regeln nur Deltas.
      */
-    public static function plan(float $grid, float $target, float $hysteresis, float $battery, float $charge, float $discharge, array $consumers, string $distribution = 'priority'): array
+    public static function plan(float $grid, float $target, float $hysteresis, float $battery, float $charge, float $discharge, array $consumers, string $distribution = 'priority', bool $batteryBuffer = true): array
     {
-        // Positive Abweichung: Bezug reduzieren. Negative Abweichung: freies Budget.
+        // Die Netzleistung enthält Lasten und Batterie bereits. Im Totbereich
+        // wird eine kleine Netzabweichung ignoriert, nicht das nutzbare Batteriebudget.
         $error = $grid - $target;
-        if (abs($error) <= $hysteresis) {
+        if (abs($error) <= $hysteresis && !$consumers) {
             return ['battery' => null, 'consumers' => []];
         }
-        $nextBattery = max(-$charge, min($discharge, $battery + $error));
-        // Nur zusätzlich angeforderte Entladung reduziert den gemessenen Bezug.
-        $remaining = $error - ($nextBattery - $battery);
+        $effectiveError = abs($error) <= $hysteresis ? 0.0 : $error;
+        if (!$consumers) {
+            return ['battery' => max(-$charge, min($discharge, $battery + $effectiveError)), 'consumers' => []];
+        }
+        // Für die Lastzuteilung ist die zulässige Entladung ein Puffer. Dieser
+        // Wert ist nur eine Budgetgrenze: geschrieben wird danach der tatsächliche Bedarf.
+        if ($batteryBuffer) {
+            $nextBattery = $discharge;
+        } elseif ($effectiveError > 0) {
+            $nextBattery = max(-$charge, min($discharge, $battery + $effectiveError));
+        } else {
+            // Ohne aktive Pufferfreigabe zuerst laufende Entladung zurücknehmen
+            // und Ladeleistung für Verbraucher freigeben, aber keine neue Entladung starten.
+            $nextBattery = max(0, min($discharge, $battery + $effectiveError));
+        }
+        $remaining = $effectiveError - ($nextBattery - $battery);
         if (!in_array($distribution, ['priority', 'equal'], true)) {
             throw new RuntimeException('Ungültige Verbraucherverteilung');
         }
@@ -67,7 +81,7 @@ final class PeakPlanner
                 }
                 $commands[$key] = $c['Unit'] === 'Switch' ? ($units > 0 ? 1 : 0) : $units;
             }
-            return ['battery' => $nextBattery, 'consumers' => $commands];
+            return self::finish($effectiveError, $battery, $charge, $discharge, $consumers, $commands);
         }
         // Größere Prioritätswerte zuerst reduzieren, kleinere zuerst wieder versorgen.
         uasort($consumers, static function (array $a, array $b) use ($remaining): int {
@@ -95,6 +109,19 @@ final class PeakPlanner
             $remaining -= $c['actual'] - $units * $factor;
             $commands[$key] = $c['Unit'] === 'Switch' ? ($units > 0 ? 1 : 0) : $units;
         }
-        return ['battery' => $nextBattery, 'consumers' => $commands];
+        return self::finish($effectiveError, $battery, $charge, $discharge, $consumers, $commands);
     }
+    private static function finish(float $error, float $battery, float $charge, float $discharge, array $consumers, array $commands): array
+    {
+        // Nur benötigte Batterieleistung anfordern: Mehrverbrauch durch Lasten
+        // plus Netzabweichung, zusätzlich zur bereits gemessenen Batterie-Leistung.
+        $needed = $battery + $error;
+        foreach ($commands as $key => $command) {
+            $c = $consumers[$key];
+            $power = $c['Unit'] === 'Switch' ? ($command ? $c['Max'] : 0) : $command * self::factor($c);
+            $needed += $power - $c['actual'];
+        }
+        return ['battery' => max(-$charge, min($discharge, $needed)), 'consumers' => $commands];
+    }
+
 }

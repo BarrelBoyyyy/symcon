@@ -47,6 +47,18 @@
       "caption": "Netzleistung: Bezug ist negativ"
     },
     {
+      "type": "CheckBox",
+      "name": "BatteryBuffer",
+      "caption": "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "LoadMaxAge",
+      "caption": "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)",
+      "minimum": 0,
+      "digits": 0
+    },
+    {
       "type": "Label",
       "caption": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
     },
@@ -215,7 +227,9 @@
           "add": "",
           "edit": {
             "type": "ValidationTextBox"
-          }
+          },
+          "save": true,
+          "visible": true
         },
         {
           "name": "Setpoint",
@@ -224,7 +238,9 @@
           "add": 0,
           "edit": {
             "type": "SelectVariable"
-          }
+          },
+          "save": true,
+          "visible": true
         },
         {
           "name": "ActualPower",
@@ -233,7 +249,9 @@
           "add": 0,
           "edit": {
             "type": "SelectVariable"
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Unit",
@@ -260,7 +278,9 @@
                 "value": "Scale"
               }
             ]
-          }
+          },
+          "save": true,
+          "visible": true
         },
         {
           "name": "Priority",
@@ -270,7 +290,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
+          },
+          "save": true,
+          "visible": true
         },
         {
           "name": "Max",
@@ -280,7 +302,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 2
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Min",
@@ -290,7 +314,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 2
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Step",
@@ -300,7 +326,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 2
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Voltage",
@@ -310,7 +338,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 2
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Phases",
@@ -320,7 +350,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "ZeroToOne",
@@ -329,7 +361,9 @@
           "add": false,
           "edit": {
             "type": "CheckBox"
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "MaxPower",
@@ -339,7 +373,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 2
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "PerPhaseW",
@@ -348,7 +384,9 @@
           "add": false,
           "edit": {
             "type": "CheckBox"
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "MinRuntime",
@@ -358,7 +396,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "FollowUp",
@@ -368,7 +408,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Delay",
@@ -378,7 +420,9 @@
           "edit": {
             "type": "NumberSpinner",
             "digits": 0
-          }
+          },
+          "save": true,
+          "visible": false
         },
         {
           "name": "Mode",
@@ -401,7 +445,220 @@
                 "value": "Off"
               }
             ]
-          }
+          },
+          "save": true,
+          "visible": true
+        },
+        {
+          "name": "UseCondition",
+          "caption": "Bedingung verwenden (optional)",
+          "width": "180px",
+          "add": false,
+          "edit": {
+            "type": "CheckBox"
+          },
+          "save": true,
+          "visible": false
+        },
+        {
+          "name": "Condition",
+          "caption": "Bedingung (nur bei Aktivierung)",
+          "width": "180px",
+          "add": "[]",
+          "edit": {
+            "type": "SelectCondition",
+            "visible": true
+          },
+          "visible": false,
+          "save": true
+        },
+        {
+          "name": "ConditionHint",
+          "caption": "Hinweis bei Blockierung",
+          "width": "180px",
+          "add": "",
+          "edit": {
+            "type": "ValidationTextBox"
+          },
+          "save": true,
+          "visible": false
+        },
+        {
+          "name": "StopOnCondition",
+          "caption": "Bei falscher Bedingung sofort stoppen",
+          "width": "180px",
+          "add": true,
+          "edit": {
+            "type": "CheckBox"
+          },
+          "save": true,
+          "visible": false
+        },
+        {
+          "name": "LastUnit",
+          "caption": "Vorherige Einheit",
+          "visible": false,
+          "save": true,
+          "add": "W"
+        }
+      ],
+      "form": [
+        {
+          "type": "ValidationTextBox",
+          "name": "Name",
+          "caption": "Name"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "Setpoint",
+          "caption": "Aktionsvariable"
+        },
+        {
+          "type": "SelectVariable",
+          "name": "ActualPower",
+          "caption": "Aktueller Verbrauch {unit} (optional)"
+        },
+        {
+          "type": "Select",
+          "options": [
+            {
+              "caption": "Watt",
+              "value": "W"
+            },
+            {
+              "caption": "Ampere",
+              "value": "A"
+            },
+            {
+              "caption": "Ein/Aus",
+              "value": "Switch"
+            },
+            {
+              "caption": "Skalierter Sollwert (z. B. %)",
+              "value": "Scale"
+            }
+          ],
+          "name": "Unit",
+          "caption": "Einheit",
+          "onChange": "PS_ConfigureLoadUnit($id, $Unit, $LastUnit, $Max, $Min, $Step, $MaxPower, $Voltage, $Phases, $PerPhaseW);"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 0,
+          "name": "Priority",
+          "caption": "Reihenfolge (1 = zuerst versorgen)"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 2,
+          "name": "Max",
+          "caption": "Maximum (Ein/Aus: Einschaltleistung {unit})"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 2,
+          "name": "Min",
+          "caption": "Minimaler aktiver Sollwert"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 2,
+          "name": "Step",
+          "caption": "Schrittweite"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 2,
+          "name": "Voltage",
+          "caption": "Spannung (V)"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 0,
+          "name": "Phases",
+          "caption": "Phasen"
+        },
+        {
+          "type": "CheckBox",
+          "name": "ZeroToOne",
+          "caption": "0 A als 1 A schreiben (Mennekes)"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 2,
+          "name": "MaxPower",
+          "caption": "Maximaler Verbrauch {unit} (skalierter Sollwert)"
+        },
+        {
+          "type": "CheckBox",
+          "name": "PerPhaseW",
+          "caption": "Leistungs-Sollwert pro Phase"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 0,
+          "name": "MinRuntime",
+          "caption": "Mindestlaufzeit (s)"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 0,
+          "name": "FollowUp",
+          "caption": "Nachlaufzeit (s)"
+        },
+        {
+          "type": "NumberSpinner",
+          "digits": 0,
+          "name": "Delay",
+          "caption": "Verzögerung nach Anpassung (s)"
+        },
+        {
+          "type": "Select",
+          "options": [
+            {
+              "caption": "Automatisch",
+              "value": "Auto"
+            },
+            {
+              "caption": "Aktiv",
+              "value": "On"
+            },
+            {
+              "caption": "Inaktiv",
+              "value": "Off"
+            }
+          ],
+          "name": "Mode",
+          "caption": "Modus"
+        },
+        {
+          "type": "CheckBox",
+          "name": "UseCondition",
+          "caption": "Bedingung verwenden (optional)",
+          "onChange": "PS_ConfigureCondition($id, $UseCondition);"
+        },
+        {
+          "type": "SelectCondition",
+          "visible": false,
+          "name": "Condition",
+          "caption": "Bedingung (nur bei Aktivierung)"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "ConditionHint",
+          "caption": "Hinweis bei Blockierung"
+        },
+        {
+          "type": "CheckBox",
+          "name": "StopOnCondition",
+          "caption": "Bei falscher Bedingung sofort stoppen"
+        },
+        {
+          "type": "ValidationTextBox",
+          "name": "LastUnit",
+          "caption": "Vorherige Einheit",
+          "visible": false,
+          "value": "W"
         }
       ]
     }

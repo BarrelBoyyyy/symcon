@@ -73,7 +73,7 @@ Die Mennekes-Option ist eine Protokollanpassung: **1 A darf nur als Stopp gelten
 4. Schrittweiten, Mindestleistung, Betriebsmodus und Laufzeitbindungen berücksichtigen.
 5. Aktionen ausführen, anschließend im nächsten Zyklus die Rückmeldung berücksichtigen.
 
-Bei Unterschreitung lädt die Batterie zuerst; Verbraucher werden angehoben, wenn ihre maximale Ladeleistung ausgeschöpft oder Laden durch SOC ausgeschlossen ist. Anders als der Energie Manager kann Peak Shaving mehrere Sollwerte in einem Zyklus verändern. Erzwungene Modus- oder Bedingungsänderungen wirken auf die Netzrückmeldung im folgenden Zyklus.
+Bei aktivierter Batterie-Pufferung steht die zulässige Entladeleistung zusätzlich für Verbraucher bereit. Es wird nur der für die endgültigen Verbraucherbefehle benötigte Batteriesollwert geschrieben. Laufende Batterieladung wird zugunsten von Verbrauchern reduziert; übrig bleibendes Budget kann den Speicher laden. Anders als der Energie Manager kann Peak Shaving mehrere Sollwerte in einem Zyklus verändern. Erzwungene Modus- oder Bedingungsänderungen wirken auf die Netzrückmeldung im folgenden Zyklus.
 
 Statusvariablen zeigen Netzbezug, Regelstatus und **geplanten Netzbezug**. Beim Einheitenwechsel werden vorhandene aktuelle Statuswerte umgerechnet; historische Archivdaten werden nicht umgeschrieben. Leistungsvariablen erhalten eigene Profile `PS.Power.W` bzw. `PS.Power.kW` (jeweils zwei Nachkommastellen). **Peak Shaving aktiv** ist nach einem erfolgreichen Regelzyklus wahr, wenn der gemessene Netzbezug über Ziel plus Hysterese liegt; im Totbereich, bei Deaktivierung und bei Fehlern ist sie falsch. Sie meldet den Regelbedarf und bestätigt keine garantierte Leistungsbegrenzung.
 
@@ -128,3 +128,16 @@ Die Bedingungsauswahl samt Variablenregeln ist vollständig entfernt. Alte Bedin
 **Regelung auslösen** bietet Sekundenintervall oder Änderung der Netzvariable. Im Änderungsmodus ist der Timer aus und nur eine tatsächliche Wertänderung löst einen Zyklus aus. Ein identischer, erneut übermittelter Messwert löst nicht aus. In diesem Modus wird auch ein Messwertalterfehler erst beim nächsten Zyklus festgestellt; es gibt keinen zusätzlichen Überwachungstimer.
 
 Unter den Aktionen des Instanzformulars **Diagnosebericht erstellen** wählen. Der Bericht erscheint als Text und in der Stringvariable **Diagnosebericht**; vollständig kopieren und bei Problemen weitergeben. Er enthält Version, Einstellungen, verwendete Variablen mit Typ/Wert/Alter, letzte Fehler und die letzten 40 Diagnoseereignisse einschließlich Schreibversuchen. Er liest ausschließlich relevante Moduldaten, keine Prozessumgebung oder Zugangsdaten. Die Diagnose löst keine Geräteaktionen aus.
+
+
+### Version 0.5: Optionale Bedingungen und Batterie als Puffer
+
+Die Verbraucherliste besitzt jetzt einen Bearbeitungsdialog. **Bedingung verwenden** ist standardmäßig aus. Erst mit diesem Haken wird der Bedingungseditor sichtbar und seine Regel geprüft; ohne Haken ist keine Bedingungsvariable nötig. Leere Bedingungen sind freigegeben. Die Istleistungsvariable bleibt optional.
+
+Beim Wechsel zwischen Watt/kW-Sollwert und Ampere werden Maximum und Minimum über Spannung und Phasenzahl umgerechnet; die Ampere-Schrittweite startet bei 1 A. Die Feldbeschriftungen folgen der gewählten Einheit. Bei Ein/Aus und Skalensteuerung werden deren relevanten Einstellungen angezeigt. Werte immer anhand des Geräts prüfen: Für eine typische 11-kW-Wallbox sind 16 A Maximum, 6 A Minimum und 1 A Schrittweite passend. In älteren Konfigurationen bereits fälschlich gespeicherte Werte wie 11.000 A werden nicht als reale Gerätegrenze übernommen; diese sind manuell zu korrigieren.
+
+Die globale Option **Batterie zur Pufferung der Verbraucher nutzen** ist standardmäßig aktiv. Die maximal zulässige Entladung erhöht das Leistungsbudget, auch wenn der Netzbezug bereits im Totbereich liegt. Die Batterie liefert nur die anschließend benötigte Differenz zwischen Netzbudget und Verbraucherbedarf. SOC- und Leistungsgrenzen begrenzen diesen Puffer. Ohne diese Freigabe wird vorhandene Batterieladung zugunsten der Verbraucher reduziert, aber keine zusätzliche Entladung zum Aktivieren von Verbrauchern eingeplant. Eine Pufferung kann die Batterie zum Laden der Wallboxen entladen; das SOC-Minimum bleibt die Untergrenze.
+
+**Maximales Alter der Verbraucher-Istleistung** ist getrennt von der Altersgrenze für Netz/Batterie/SOC. Standard 0 deaktiviert ausschließlich die Altersprüfung für optionale Verbraucher-Messwerte, deren Geräte häufig nur bei Wertänderungen senden. Dann wird der letzte numerische Wert verwendet, was eine funktionierende Geräteanbindung voraussetzt. Wer Ausfälle dieser Rückmeldung erkennen möchte, trägt eine passende positive Grenze ein. Die Altersprüfung der Netz-/Batteriemessung bleibt bestehen. Die Diagnose enthält für alle Messwerte weiterhin ihr tatsächliches Alter.
+
+Die Kachel hat zusätzlich 64 Pixel Abstand oben, damit der Inhalt unter dem vom Benutzer vergebenen Titel beginnt. Die 0.5-Tests enthalten den Fall aus dem bereitgestellten Diagnosebericht mit vier Wallboxen und Batteriepuffer.

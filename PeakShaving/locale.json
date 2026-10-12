@@ -95,7 +95,14 @@
       "Diagnosebericht erstellen": "Diagnosebericht erstellen",
       "Diagnosebericht": "Diagnosebericht",
       "Reihenfolge (1 = zuerst versorgen)": "Reihenfolge (1 = zuerst versorgen)",
-      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
+      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.",
+      "Bedingung verwenden (optional)": "Bedingung verwenden (optional)",
+      "Bedingung (nur bei Aktivierung)": "Bedingung (nur bei Aktivierung)",
+      "Maximum (A)": "Maximum (A)",
+      "Minimaler aktiver Sollwert (A)": "Minimaler aktiver Sollwert (A)",
+      "Schrittweite (A)": "Schrittweite (A)",
+      "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)": "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)",
+      "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)": "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)"
     },
     "en": {
       "Regelung aktivieren": "Regelung aktivieren",
@@ -192,7 +199,14 @@
       "Diagnosebericht erstellen": "Diagnosebericht erstellen",
       "Diagnosebericht": "Diagnosebericht",
       "Reihenfolge (1 = zuerst versorgen)": "Reihenfolge (1 = zuerst versorgen)",
-      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren."
+      "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.": "Gleichmäßig: Leistungsbudget auf alle automatischen Verbraucher verteilen. Reihenfolge: zuerst kleinere Nummern versorgen, größere zuerst reduzieren.",
+      "Bedingung verwenden (optional)": "Bedingung verwenden (optional)",
+      "Bedingung (nur bei Aktivierung)": "Bedingung (nur bei Aktivierung)",
+      "Maximum (A)": "Maximum (A)",
+      "Minimaler aktiver Sollwert (A)": "Minimaler aktiver Sollwert (A)",
+      "Schrittweite (A)": "Schrittweite (A)",
+      "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)": "Batterie zur Pufferung der Verbraucher nutzen (innerhalb Leistungs- und SOC-Grenzen)",
+      "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)": "Maximales Alter der Verbraucher-Istleistung (Sekunden; 0 = keine Altersprüfung)"
     }
   }
 }

@@ -11,6 +11,7 @@ class PeakShaving extends IPSModule
         $this->RegisterPropertyBoolean('Enabled', false);
         $this->RegisterPropertyBoolean('InvertGrid', false);
         $this->RegisterPropertyBoolean('PeakOverridesHold', true);
+        $this->RegisterPropertyBoolean('BatteryBuffer', true);
         $this->RegisterPropertyBoolean('InvertBattery', false);
         $this->RegisterPropertyBoolean('InvertBatteryCommand', false);
         $this->RegisterPropertyBoolean('InvertCharge', false);
@@ -19,7 +20,7 @@ class PeakShaving extends IPSModule
         $this->RegisterPropertyString('PowerUnit', 'W');
         $this->RegisterPropertyString('Distribution', 'priority');
         $this->RegisterPropertyString('UpdateMode', 'timer');
-        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0] as $name => $value) {
+        foreach (['GridPower' => 0, 'Interval' => 5, 'MaxAge' => 60, 'LoadMaxAge' => 0, 'BatteryActual' => 0, 'BatterySetpoint' => 0, 'SOC' => 0, 'BatteryCharge' => 0, 'BatteryDischarge' => 0] as $name => $value) {
             $this->RegisterPropertyInteger($name, $value);
         }
         foreach (['Target' => 5000, 'Hysteresis' => 100, 'MaxDischarge' => 3000, 'MaxCharge' => 3000, 'MinSOC' => 20, 'MaxSOC' => 90] as $name => $value) {
@@ -104,6 +105,94 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         }
     }
 
+    public function ConfigureCondition(bool $enabled): void
+    {
+        // Der ausgeblendete Editor darf ohne Bedingung keine Variablenauswahl erzwingen.
+        foreach (['Condition', 'ConditionHint', 'StopOnCondition'] as $name) {
+            $this->UpdateFormField($name, 'visible', $enabled);
+        }
+    }
+
+    public function GetConsumerForm(string $unit, bool $condition): string
+    {
+        $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($form['elements'] as $element) {
+            if (($element['name'] ?? '') === 'Consumers') {
+                $fields = $element['form'];
+                foreach ($fields as &$field) {
+                    $name = $field['name'];
+                    if ($name === 'LastUnit') {
+                        $field['value'] = $unit;
+                    }
+                    if (in_array($name, ['Condition', 'ConditionHint', 'StopOnCondition'], true)) {
+                        $field['visible'] = $condition;
+                    }
+                    if ($name === 'Unit') {
+                        $field['options'][0]['caption'] = $this->ReadPropertyString('PowerUnit');
+                    }
+                    $field['caption'] = $this->consumerCaption($name, $unit, $field['caption']);
+                    if (in_array($name, ['MaxPower', 'Voltage', 'Phases', 'PerPhaseW', 'ZeroToOne', 'Min', 'Step'], true)) {
+                        $field['visible'] = $this->consumerFieldVisible($name, $unit);
+                    }
+                }
+                unset($field);
+                return json_encode($fields, JSON_THROW_ON_ERROR);
+            }
+        }
+        return '[]';
+    }
+
+    private function consumerCaption(string $name, string $unit, string $fallback): string
+    {
+        $powerUnit = $this->ReadPropertyString('PowerUnit');
+        $selected = $unit === 'A' ? 'A' : ($unit === 'Scale' ? 'Skalenwert' : $powerUnit);
+        $captions = ['Max' => 'Maximum (' . $selected . ')', 'Min' => 'Minimaler aktiver Sollwert (' . $selected . ')',
+            'Step' => 'Schrittweite (' . $selected . ')', 'MaxPower' => 'Maximaler Verbrauch (' . $powerUnit . ')'];
+        return $captions[$name] ?? str_replace('{unit}', $powerUnit, $fallback);
+    }
+
+    private function consumerFieldVisible(string $name, string $unit): bool
+    {
+        if ($name === 'MaxPower') {
+            return $unit === 'Scale';
+        }
+        if ($name === 'ZeroToOne') {
+            return $unit === 'A';
+        }
+        if ($name === 'PerPhaseW') {
+            return $unit === 'W';
+        }
+        if (in_array($name, ['Voltage', 'Phases'], true)) {
+            return in_array($unit, ['A', 'W'], true);
+        }
+        return $unit !== 'Switch';
+    }
+
+    public function ConfigureLoadUnit(string $unit, string $previous, float $max, float $min, float $step, float $maxPower, float $voltage, int $phases, bool $perPhase): void
+    {
+        if (!in_array($unit, ['W', 'A', 'Switch', 'Scale'], true)) {
+            throw new RuntimeException('Ungültige Verbrauchereinheit');
+        }
+        if ($unit !== $previous) {
+            $old = ['Unit' => $previous, 'Max' => $max, 'MaxPower' => $maxPower, 'Voltage' => $voltage, 'Phases' => $phases, 'PerPhaseW' => $perPhase, 'PowerFactor' => $this->powerFactor()];
+            $new = array_replace($old, ['Unit' => $unit]);
+            if (in_array($previous, ['W', 'A'], true) && in_array($unit, ['W', 'A'], true) && $voltage > 0 && $phases > 0) {
+                // Die gleiche physische Leistungsgrenze bleibt beim Einheitenwechsel erhalten.
+                $ratio = PeakPlanner::factor($old) / PeakPlanner::factor($new);
+                $this->UpdateFormField('Max', 'value', round($max * $ratio, 2));
+                $this->UpdateFormField('Min', 'value', round($min * $ratio, 2));
+                $this->UpdateFormField('Step', 'value', $unit === 'A' ? 1 : max(0.01, round($step * $ratio, 2)));
+            }
+            $this->UpdateFormField('LastUnit', 'value', $unit);
+        }
+        foreach (['Max', 'Min', 'Step', 'MaxPower'] as $name) {
+            $this->UpdateFormField($name, 'caption', $this->consumerCaption($name, $unit, $name));
+        }
+        foreach (['MaxPower', 'Voltage', 'Phases', 'PerPhaseW', 'ZeroToOne', 'Min', 'Step'] as $name) {
+            $this->UpdateFormField($name, 'visible', $this->consumerFieldVisible($name, $unit));
+        }
+    }
+
     public function ConfigureUpdateMode(string $mode): void
     {
         $this->UpdateFormField('Interval', 'visible', $mode === 'timer');
@@ -129,7 +218,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
     public function GetDiagnostics(): string
     {
         $settings = [];
-        foreach (['Enabled', 'InvertGrid', 'InvertBattery', 'InvertBatteryCommand', 'InvertCharge', 'InvertDischarge', 'PeakOverridesHold'] as $name) {
+        foreach (['Enabled', 'InvertGrid', 'InvertBattery', 'InvertBatteryCommand', 'InvertCharge', 'InvertDischarge', 'PeakOverridesHold', 'BatteryBuffer'] as $name) {
             $settings[$name] = $this->ReadPropertyBoolean($name);
         }
         foreach (['PowerUnit', 'BatteryMode', 'Distribution', 'UpdateMode'] as $name) {
@@ -138,7 +227,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         foreach (['Target', 'Hysteresis', 'MaxCharge', 'MaxDischarge', 'MinSOC', 'MaxSOC'] as $name) {
             $settings[$name] = $this->ReadPropertyFloat($name);
         }
-        foreach (['Interval', 'MaxAge'] as $name) {
+        foreach (['Interval', 'MaxAge', 'LoadMaxAge'] as $name) {
             $settings[$name] = $this->ReadPropertyInteger($name);
         }
         $variables = [];
@@ -150,13 +239,13 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         $configuredLoads = json_decode($this->ReadPropertyString('Consumers'), true);
         foreach (is_array($configuredLoads) ? $configuredLoads : [] as $load) {
             // Nur bekannte Steuerparameter aufnehmen; keine fremden Stringwerte/Umgebungsdaten.
-            $entry = array_intersect_key($load, array_flip(['Name', 'Unit', 'Priority', 'Mode', 'Min', 'Max', 'Step', 'MaxPower', 'Voltage', 'Phases', 'PerPhaseW', 'ZeroToOne', 'MinRuntime', 'FollowUp', 'Delay']));
+            $entry = array_intersect_key($load, array_flip(['Name', 'Unit', 'Priority', 'Mode', 'Min', 'Max', 'Step', 'MaxPower', 'Voltage', 'Phases', 'PerPhaseW', 'ZeroToOne', 'MinRuntime', 'FollowUp', 'Delay', 'UseCondition', 'Condition']));
             $entry['Laufzeitänderungen'] = $overrides[(string) ($load['Setpoint'] ?? 0)] ?? [];
             $entry['Aktionsvariable'] = $this->diagnosticVariable((int) ($load['Setpoint'] ?? 0));
             $entry['Istleistung'] = $this->diagnosticVariable((int) ($load['ActualPower'] ?? 0));
             $loads[] = $entry;
         }
-        return json_encode(['Modulversion' => '0.4', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
+        return json_encode(['Modulversion' => '0.5', 'Instanz' => $this->InstanceID, 'Erstellt UTC' => gmdate('c'),
             'Letzte Regelung UTC' => $this->ReadAttributeString('LastRun'), 'Letzter Fehler' => $this->ReadAttributeString('LastError'),
             'Regelstatus' => $this->GetValue('State'), 'Einstellungen' => $settings, 'Variablen' => $variables,
             'Verbraucher' => $loads, 'Netzvariable abonniert' => (int) $this->ReadAttributeString('SubscribedGrid'),
@@ -233,8 +322,9 @@ $this->WriteAttributeString('LastError', $e->getMessage());
             if ($name === 'Consumers') {
                 $element = $this->loadFormUnit($element, $unit);
                 $overrides = json_decode($this->ReadAttributeString('LoadOverrides'), true);
+                $element['form'] = 'return json_decode(PS_GetConsumerForm($id, $Consumers["Unit"] ?? "W", $Consumers["UseCondition"] ?? false), true);';
                 $element['loadValuesFromConfiguration'] = false;
-                $element['values'] = array_map(static fn(array $load): array => array_replace($load, $overrides[(string) ($load['Setpoint'] ?? 0)] ?? []), json_decode($this->ReadPropertyString('Consumers'), true));
+                $element['values'] = array_map(static fn(array $load): array => array_replace($load, $overrides[(string) ($load['Setpoint'] ?? 0)] ?? [], ['LastUnit' => $load['Unit'] ?? 'W']), json_decode($this->ReadPropertyString('Consumers'), true));
             }
         }
         unset($element);
@@ -330,6 +420,32 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         }
     }
 
+    private function conditionPassing($condition): bool
+    {
+        $json = is_string($condition) ? $condition : json_encode($condition, JSON_THROW_ON_ERROR);
+        if (trim($json) === '') {
+            return true;
+        }
+        $nodes = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        if (!$nodes) {
+            return true;
+        }
+        $roots = isset($nodes['rules']) ? [$nodes] : $nodes;
+        $empty = true;
+        foreach ($roots as $node) {
+            if (!is_array($node) || !isset($node['rules'])) {
+                $empty = false;
+                break;
+            }
+            foreach ($node['rules'] as $rules) {
+                if (!empty($rules)) {
+                    $empty = false;
+                }
+            }
+        }
+        return $empty || IPS_IsConditionPassing($json);
+    }
+
     public function GetVisualizationTile()
     {
         $data = json_encode($this->visualizationData(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
@@ -420,7 +536,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         $this->publishVisualization();
     }
 
-    private function readMeasurement(int $id, string $name = 'Leistung'): float
+    private function readMeasurement(int $id, string $name = 'Leistung', ?int $maxAge = null): float
     {
         if (!$id || !IPS_VariableExists($id)) {
             throw new RuntimeException('Messvariable für ' . $name . ' nicht ausgewählt oder nicht vorhanden (ID ' . $id . ')');
@@ -429,8 +545,8 @@ $this->WriteAttributeString('LastError', $e->getMessage());
         if (!in_array($meta['VariableType'], [1, 2], true)) {
             throw new RuntimeException('Messvariable muss numerisch sein: ' . $id);
         }
-        if (time() - $meta['VariableUpdated'] > $this->ReadPropertyInteger('MaxAge')) {
-            throw new RuntimeException('Messwert ist veraltet: ' . $id);
+        if (($maxAge ?? $this->ReadPropertyInteger('MaxAge')) > 0 && time() - $meta['VariableUpdated'] > ($maxAge ?? $this->ReadPropertyInteger('MaxAge'))) {
+            throw new RuntimeException('Messwert für ' . $name . ' ist veraltet (ID ' . $id . ', Alter ' . (time() - $meta['VariableUpdated']) . ' s)');
         }
         $value = (float) GetValue($id);
         if (!is_finite($value)) {
@@ -525,7 +641,7 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 throw new RuntimeException('Verbraucherliste ungültig');
             }
             foreach ($consumers as &$c) {
-                $c = array_replace(['Name' => '', 'Setpoint' => 0, 'ActualPower' => 0, 'Unit' => 'W', 'Priority' => 1, 'Max' => 11000 * $this->powerFactor(), 'Min' => 0, 'Step' => 100 * $this->powerFactor(), 'Voltage' => 230, 'Phases' => 3, 'ZeroToOne' => false, 'MaxPower' => 5000 * $this->powerFactor(), 'PerPhaseW' => false, 'Condition' => '[]', 'ConditionHint' => '', 'MinRuntime' => 0, 'FollowUp' => 0, 'Delay' => 0, 'StopOnCondition' => true, 'Mode' => 'Auto', 'PowerFactor' => $this->powerFactor()], $c);
+                $c = array_replace(['Name' => '', 'Setpoint' => 0, 'ActualPower' => 0, 'Unit' => 'W', 'Priority' => 1, 'Max' => 11000 * $this->powerFactor(), 'Min' => 0, 'Step' => 100 * $this->powerFactor(), 'Voltage' => 230, 'Phases' => 3, 'ZeroToOne' => false, 'MaxPower' => 5000 * $this->powerFactor(), 'PerPhaseW' => false, 'UseCondition' => false, 'Condition' => '[]', 'ConditionHint' => '', 'MinRuntime' => 0, 'FollowUp' => 0, 'Delay' => 0, 'StopOnCondition' => true, 'Mode' => 'Auto', 'PowerFactor' => $this->powerFactor()], $c);
                 $this->checkAction((int) $c['Setpoint'], $c['Unit'] === 'Switch');
                 if (in_array($c['Setpoint'], $ids)) {
                     throw new RuntimeException('Aktionsvariable mehrfach zugeordnet');
@@ -536,17 +652,20 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 }
                 $overrides = json_decode($this->ReadAttributeString('LoadOverrides'), true, 512, JSON_THROW_ON_ERROR);
                 $c = array_replace($c, $overrides[(string) $c['Setpoint']] ?? []);
+                if ($c['Unit'] === 'A' && ($c['Max'] > 1000 || $c['Step'] > $c['Max'])) {
+                    throw new RuntimeException(($c['Name'] ?: 'Wallbox') . ': Ampere-Modus erfordert Grenzen in A (z.B. Maximum 16, Minimum 6, Schrittweite 1), nicht Watt');
+                }
                 $c['commanded'] = (float) GetValue((int) $c['Setpoint']);
-                $c['actual'] = $c['ActualPower'] ? $this->readMeasurement((int) $c['ActualPower']) : ($c['Unit'] === 'Switch' ? ($c['commanded'] ? $c['Max'] : 0) : ($c['Unit'] === 'A' && $c['ZeroToOne'] && $c['commanded'] <= 1 ? 0 : $c['commanded'] * PeakPlanner::factor($c)));
-                // Keine Bedingungsvariable erforderlich; alte Bedingungsfelder werden ignoriert.
-                $c['allowed'] = true;
+                $c['actual'] = $c['ActualPower'] ? $this->readMeasurement((int) $c['ActualPower'], ($c['Name'] ?: 'Verbraucher') . ': Istleistung', $this->ReadPropertyInteger('LoadMaxAge')) : ($c['Unit'] === 'Switch' ? ($c['commanded'] ? $c['Max'] : 0) : ($c['Unit'] === 'A' && $c['ZeroToOne'] && $c['commanded'] <= 1 ? 0 : $c['commanded'] * PeakPlanner::factor($c)));
+                // Nur ausdrücklich aktivierte Bedingungen prüfen. Ohne Haken keine Variable nötig.
+                $c['allowed'] = !$c['UseCondition'] || $this->conditionPassing($c['Condition']);
                 if ($c['actual'] < 0) {
                     throw new RuntimeException('Verbraucherleistung muss positiv sein');
                 }
             }
             unset($c);
             $automatic = array_filter($consumers, static fn(array $c): bool => $c['Mode'] === 'Auto' && $c['allowed']);
-            $plan = PeakPlanner::plan($grid, $this->ReadPropertyFloat('Target'), $this->ReadPropertyFloat('Hysteresis'), $battery, $charge, $discharge, $automatic, $this->ReadPropertyString('Distribution'));
+            $plan = PeakPlanner::plan($grid, $this->ReadPropertyFloat('Target'), $this->ReadPropertyFloat('Hysteresis'), $battery, $charge, $discharge, $automatic, $this->ReadPropertyString('Distribution'), $this->ReadPropertyBoolean('BatteryBuffer'));
             $override = $this->ReadPropertyBoolean('PeakOverridesHold') && $grid > $this->ReadPropertyFloat('Target') + $this->ReadPropertyFloat('Hysteresis');
             $notes = [];
             foreach ($consumers as $key => $c) {
@@ -585,6 +704,17 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 }
                 $timing[$id] = $state;
             }
+            if ($plan['battery'] !== null) {
+                // Laufzeitbindungen, Bedingungen und manuelle Modi können den Plan
+                // ändern. Den Batteriepuffer anhand der endgültigen Befehle nachführen.
+                $difference = $grid - $this->ReadPropertyFloat('Target');
+                $needed = $battery + (abs($difference) <= $this->ReadPropertyFloat('Hysteresis') ? 0 : $difference);
+                foreach ($plan['consumers'] as $key => $value) {
+                    $load = $consumers[$key];
+                    $needed += ($load['Unit'] === 'Switch' ? ($value ? $load['Max'] : 0) : $value * PeakPlanner::factor($load)) - $load['actual'];
+                }
+                $plan['battery'] = max(-$charge, min($discharge, $needed));
+            }
             // SOC-Grenzen gelten auch im Totbereich. Eine gemeinsame Variable
             // benötigt keinen Moduswechsel: Das konfigurierbare Vorzeichen bestimmt die Richtung.
             if ($hasBattery) {
@@ -593,6 +723,12 @@ $this->WriteAttributeString('LastError', $e->getMessage());
                 $dischargeSign = $this->ReadPropertyBoolean('InvertDischarge') ? -1 : 1;
                 $commanded = $mode === 'signed' ? $commandSign * (float) GetValue($batteryID) : $dischargeSign * (float) GetValue($dischargeID) - $chargeSign * (float) GetValue($batteryID);
                 $setpoint = $plan['battery'] ?? max(-$charge, min($discharge, $commanded));
+                // Ganzzahlige Watt-Aktionsvariablen auf deren reale Auflösung
+                // runden; Float-Istwerte dürfen trotzdem in die Regelung eingehen.
+                $outputID = $mode === 'signed' || $setpoint < 0 ? $batteryID : $dischargeID;
+                if ($this->ReadPropertyString('PowerUnit') === 'W' && IPS_GetVariable($outputID)['VariableType'] === 1) {
+                    $setpoint = max(-$charge, min($discharge, round($setpoint)));
+                }
                 if ($mode === 'signed') {
                     $this->writeAction($batteryID, $commandSign * $setpoint);
                 } elseif ($setpoint >= 0) {
